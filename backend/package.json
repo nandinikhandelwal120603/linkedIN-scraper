@@ -1,0 +1,20 @@
+{
+  "name": "ai-outreach-agent-backend",
+  "version": "1.0.0",
+  "description": "Backend for AI Outreach Agent (Job Hunter Edition)",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

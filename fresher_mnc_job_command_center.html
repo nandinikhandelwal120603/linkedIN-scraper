@@ -1,0 +1,526 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font-sans);}
+.app{padding:1.25rem 0;}
+h1{font-size:20px;font-weight:500;color:var(--color-text-primary);margin-bottom:3px;}
+.sub{font-size:13px;color:var(--color-text-secondary);margin-bottom:1.25rem;}
+.panel{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:12px;}
+.ptitle{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.keys-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px;}
+.kf label{font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:3px;}
+.kf input{width:100%;font-size:12px;padding:7px 9px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);font-family:var(--font-mono);}
+.save-btn{background:var(--color-text-primary);color:var(--color-background-primary);border:none;border-radius:var(--border-radius-md);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
+.save-btn:hover{opacity:0.85;}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;}
+.don{background:#639922;}.doff{background:var(--color-border-secondary);}
+.spills{display:flex;gap:12px;font-size:12px;color:var(--color-text-secondary);margin-top:8px;flex-wrap:wrap;align-items:center;}
+.tabs-main{display:flex;gap:0;margin-bottom:1.25rem;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);overflow:hidden;}
+.tmain{flex:1;font-size:13px;padding:9px 0;border:none;background:none;color:var(--color-text-secondary);cursor:pointer;text-align:center;font-weight:400;}
+.tmain.on{background:var(--color-text-primary);color:var(--color-background-primary);font-weight:500;}
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+.field label{font-size:11px;color:var(--color-text-secondary);display:block;margin-bottom:3px;}
+.field input,.field select,.field textarea{width:100%;font-size:13px;padding:7px 9px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);}
+.field textarea{resize:vertical;min-height:70px;font-family:var(--font-sans);line-height:1.5;}
+.field.full{grid-column:1/-1;}
+.mnc-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;}
+.fchip{font-size:12px;padding:5px 12px;border:0.5px solid var(--color-border-secondary);border-radius:999px;background:var(--color-background-primary);color:var(--color-text-secondary);cursor:pointer;}
+.fchip.sel{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary);}
+.hunt-btn{background:var(--color-text-primary);color:var(--color-background-primary);border:none;border-radius:var(--border-radius-lg);padding:10px 24px;font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:1rem;}
+.hunt-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.hunt-btn:hover:not(:disabled){opacity:0.85;}
+.jcard{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:10px;}
+.jcard-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.logo-box{width:42px;height:42px;border-radius:10px;background:var(--color-background-secondary);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-secondary);flex-shrink:0;border:0.5px solid var(--color-border-tertiary);}
+.jname{font-size:14px;font-weight:500;color:var(--color-text-primary);}
+.jrole{font-size:12px;color:var(--color-text-secondary);margin-top:2px;}
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;font-weight:500;}
+.bg{background:#EAF3DE;color:#3B6D11;}
+.bb{background:#E6F1FB;color:#185FA5;}
+.ba{background:#FAEEDA;color:#854F0B;}
+.bp{background:#EEEDFE;color:#3C3489;}
+.info-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-secondary);margin-bottom:4px;}
+.info-row .v{color:var(--color-text-primary);}
+.action-row{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;}
+.act{font-size:12px;padding:5px 11px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer;display:flex;align-items:center;gap:4px;}
+.act:hover{background:var(--color-background-secondary);}
+.send-btn{background:#185FA5;color:#fff;border:none;border-radius:var(--border-radius-md);font-size:12px;padding:5px 13px;cursor:pointer;display:flex;align-items:center;gap:4px;font-weight:500;}
+.send-btn:hover{background:#0C447C;}
+.send-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.draft-box{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.875rem;font-size:12px;line-height:1.65;color:var(--color-text-primary);white-space:pre-wrap;margin-top:8px;border:0.5px solid var(--color-border-tertiary);}
+.draft-box[contenteditable]{outline:none;cursor:text;}
+.draft-box[contenteditable]:focus{border-color:var(--color-border-primary);}
+.subj-lbl{font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:3px;}
+.collapsed .jcard-body{display:none;}
+.toggle-btn{font-size:11px;color:var(--color-text-secondary);background:none;border:none;cursor:pointer;padding:0;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--color-border-secondary);border-top-color:var(--color-text-primary);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty{text-align:center;padding:2.5rem;color:var(--color-text-secondary);font-size:14px;}
+.err-box{background:#FCEBEB;border:0.5px solid #F09595;border-radius:var(--border-radius-md);padding:10px 14px;font-size:12px;color:#791F1F;margin-bottom:10px;}
+.ok-box{background:#EAF3DE;border:0.5px solid #C0DD97;border-radius:var(--border-radius-md);padding:10px 14px;font-size:12px;color:#3B6D11;margin-bottom:6px;}
+.resume-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.resume-col h3{font-size:13px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px;}
+.resume-box{width:100%;min-height:320px;font-size:12px;padding:10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);resize:vertical;font-family:var(--font-mono);line-height:1.6;}
+.resume-out{min-height:320px;font-size:12px;padding:10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);color:var(--color-text-primary);white-space:pre-wrap;font-family:var(--font-mono);line-height:1.6;overflow-y:auto;}
+.role-target{width:100%;font-size:13px;padding:8px 10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-primary);color:var(--color-text-primary);margin-bottom:10px;}
+.rewrite-btn{background:var(--color-text-primary);color:var(--color-background-primary);border:none;border-radius:var(--border-radius-md);padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:6px;}
+.rewrite-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.changes-list{margin-top:10px;font-size:12px;color:var(--color-text-secondary);padding:8px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);}
+.changes-list li{margin-bottom:4px;line-height:1.5;}
+.progress-bar{height:3px;background:var(--color-border-tertiary);border-radius:2px;margin-bottom:1rem;overflow:hidden;}
+.progress-fill{height:100%;background:var(--color-text-primary);border-radius:2px;transition:width .4s;}
+.mnc-list-panel{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:1rem;}
+.mnc-item{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 10px;cursor:pointer;border:0.5px solid transparent;font-size:12px;color:var(--color-text-primary);}
+.mnc-item:hover{border-color:var(--color-border-secondary);}
+.mnc-item.picked{border-color:var(--color-text-primary);background:var(--color-background-primary);}
+.mnc-name{font-weight:500;font-size:12px;}
+.mnc-sub{font-size:10px;color:var(--color-text-secondary);margin-top:2px;}
+.sec-title{font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
+</style>
+
+<div class="app">
+  <h2 class="sr-only">MNC Job Hunter + Resume Editor for freshers</h2>
+  <h1><i class="ti ti-building-skyscraper" aria-hidden="true" style="font-size:18px;vertical-align:-2px;margin-right:7px;"></i>MNC Job Command Center</h1>
+  <p class="sub">AI hunts MNCs hiring freshers · finds HR contacts · rewrites your resume per role · sends emails</p>
+
+  <!-- Keys -->
+  <div class="panel">
+    <div class="ptitle"><i class="ti ti-key" aria-hidden="true"></i> API keys</div>
+    <div class="keys-grid">
+      <div class="kf"><label>Gemini key <span style="color:#3B6D11;font-size:10px;">★ required</span></label><input type="password" id="k-g" placeholder="AIza..." autocomplete="off"></div>
+      <div class="kf"><label>Serper.dev key <span style="color:#854F0B;font-size:10px;">free 2500/mo — powers job search</span></label><input type="password" id="k-s" placeholder="serper key..." autocomplete="off"></div>
+      <div class="kf"><label>Gmail OAuth token <span style="color:#854F0B;font-size:10px;">for 1-click email send</span></label><input type="password" id="k-gm" placeholder="access_token..." autocomplete="off"></div>
+      <div class="kf"><label>Your Gmail</label><input type="email" id="k-ge" placeholder="you@gmail.com"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button class="save-btn" onclick="saveKeys()"><i class="ti ti-check" aria-hidden="true"></i> Save</button>
+      <button class="act" onclick="window.open('https://developers.google.com/oauthplayground','_blank')" style="font-size:12px;"><i class="ti ti-brand-google" aria-hidden="true"></i> Get Gmail token</button>
+      <div class="spills"><span><span class="dot doff" id="dg"></span>Gemini</span><span><span class="dot doff" id="ds"></span>Serper</span><span><span class="dot doff" id="dgm"></span>Gmail</span></div>
+    </div>
+  </div>
+
+  <!-- Profile -->
+  <div class="panel">
+    <div class="ptitle"><i class="ti ti-id-badge" aria-hidden="true"></i> Your profile</div>
+    <div class="profile-grid">
+      <div class="field"><label>Full name</label><input type="text" id="p-name" placeholder="Rahul Sharma"></div>
+      <div class="field"><label>Degree & branch</label><input type="text" id="p-deg" placeholder="B.Tech Computer Science 2024"></div>
+      <div class="field"><label>College</label><input type="text" id="p-col" placeholder="NIT Warangal"></div>
+      <div class="field"><label>CGPA / %</label><input type="text" id="p-cgpa" placeholder="8.5 CGPA"></div>
+      <div class="field full"><label>Skills</label><input type="text" id="p-skills" placeholder="Python, React, SQL, Machine Learning, Java, AWS..."></div>
+      <div class="field"><label>Target role</label><input type="text" id="p-role" placeholder="SDE-1, Data Analyst, SWE..."></div>
+      <div class="field"><label>LinkedIn</label><input type="text" id="p-li" placeholder="linkedin.com/in/you"></div>
+      <div class="field"><label>Portfolio / GitHub</label><input type="text" id="p-gh" placeholder="github.com/you"></div>
+      <div class="field full"><label>Projects & achievements</label><textarea id="p-proj" placeholder="Built X project with Y tech. Won hackathon. Interned at..."></textarea></div>
+    </div>
+  </div>
+
+  <!-- Main tabs -->
+  <div class="tabs-main">
+    <button class="tmain on" onclick="switchMain('jobs')" id="mt-jobs"><i class="ti ti-search" aria-hidden="true"></i> Job Hunter</button>
+    <button class="tmain" onclick="switchMain('resume')" id="mt-resume"><i class="ti ti-file-text" aria-hidden="true"></i> Resume Editor</button>
+  </div>
+
+  <!-- JOB HUNTER TAB -->
+  <div id="tab-jobs">
+    <div class="panel">
+      <div class="ptitle"><i class="ti ti-building-skyscraper" aria-hidden="true"></i> Pick MNCs to hunt</div>
+      <div class="mnc-list-panel" id="mnc-grid"></div>
+      <div class="sec-title">Filter by domain</div>
+      <div class="mnc-filters" id="domain-filters"></div>
+    </div>
+    <button class="hunt-btn" id="hunt-btn" onclick="doHunt()" disabled>
+      <i class="ti ti-radar-2" aria-hidden="true"></i> Hunt jobs at selected MNCs
+    </button>
+    <div id="hunt-progress" style="display:none;"><div class="progress-bar"><div class="progress-fill" id="pbar" style="width:0%"></div></div></div>
+    <div id="hunt-err"></div>
+    <div id="hunt-results"><div class="empty"><i class="ti ti-building-skyscraper" aria-hidden="true" style="font-size:36px;display:block;margin-bottom:10px;color:var(--color-border-secondary);"></i>Select MNCs above and click Hunt — AI will find open fresher roles and HR contacts</div></div>
+  </div>
+
+  <!-- RESUME EDITOR TAB -->
+  <div id="tab-resume" style="display:none;">
+    <div class="panel">
+      <div class="ptitle"><i class="ti ti-sparkles" aria-hidden="true"></i> AI Resume Rewriter</div>
+      <input type="text" class="role-target" id="res-role" placeholder="Target role + company — e.g. SDE-1 at Google, Data Analyst at Microsoft...">
+      <div class="resume-wrap">
+        <div class="resume-col">
+          <h3>Paste your current resume text</h3>
+          <textarea class="resume-box" id="res-input" placeholder="Paste your resume content here — education, experience, skills, projects, achievements..."></textarea>
+        </div>
+        <div class="resume-col">
+          <h3>AI rewritten version <span style="font-size:10px;font-weight:400;color:var(--color-text-secondary);">(auto-adjusted for role)</span></h3>
+          <div class="resume-out" id="res-output">Your rewritten resume will appear here…</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+        <button class="rewrite-btn" id="rw-btn" onclick="rewriteResume()" disabled>
+          <i class="ti ti-wand" aria-hidden="true"></i> Rewrite & optimise
+        </button>
+        <button class="act" id="copy-res-btn" onclick="copyResume()" style="display:none;"><i class="ti ti-copy" aria-hidden="true"></i> Copy result</button>
+        <button class="act" id="dl-res-btn" onclick="downloadResume()" style="display:none;"><i class="ti ti-download" aria-hidden="true"></i> Download .txt</button>
+      </div>
+      <div id="res-changes" style="display:none;">
+        <div class="changes-list" id="changes-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MNCS=[
+  {name:'Google',abbr:'GOOG',domain:'Tech',hq:'Mountain View, US',roles:'SWE, SDE, Analyst'},
+  {name:'Microsoft',abbr:'MSFT',domain:'Tech',hq:'Redmond, US',roles:'SWE, PM, Data'},
+  {name:'Amazon',abbr:'AMZN',domain:'Tech/E-comm',hq:'Seattle, US',roles:'SDE, DA, SC'},
+  {name:'Meta',abbr:'META',domain:'Tech',hq:'Menlo Park, US',roles:'SWE, DS, PM'},
+  {name:'Apple',abbr:'AAPL',domain:'Tech',hq:'Cupertino, US',roles:'SWE, QA, ML'},
+  {name:'IBM',abbr:'IBM',domain:'Tech/Consulting',hq:'Armonk, US',roles:'Dev, Consultant, Data'},
+  {name:'Accenture',abbr:'ACN',domain:'Consulting',hq:'Dublin, IE',roles:'Analyst, Dev, Consulting'},
+  {name:'TCS',abbr:'TCS',domain:'IT Services',hq:'Mumbai, IN',roles:'SWE, Dev, Testing'},
+  {name:'Infosys',abbr:'INFY',domain:'IT Services',hq:'Bengaluru, IN',roles:'SWE, Dev, Analyst'},
+  {name:'Wipro',abbr:'WPRO',domain:'IT Services',hq:'Bengaluru, IN',roles:'SWE, Dev, Testing'},
+  {name:'Cognizant',abbr:'CTS',domain:'IT Services',hq:'Teaneck, US',roles:'Associate, Dev, QA'},
+  {name:'Deloitte',abbr:'DLT',domain:'Consulting',hq:'London, UK',roles:'Analyst, Consultant, Tech'},
+  {name:'Goldman Sachs',abbr:'GS',domain:'Finance',hq:'New York, US',roles:'Analyst, Dev, Quant'},
+  {name:'JP Morgan',abbr:'JPM',domain:'Finance',hq:'New York, US',roles:'Analyst, SWE, Data'},
+  {name:'Samsung',abbr:'SMSN',domain:'Tech/Hardware',hq:'Seoul, KR',roles:'SWE, HW, ML'},
+  {name:'Intel',abbr:'INTC',domain:'Tech/Hardware',hq:'Santa Clara, US',roles:'SWE, HW, Verification'},
+  {name:'Oracle',abbr:'ORCL',domain:'Tech',hq:'Austin, US',roles:'SWE, Cloud, DBA'},
+  {name:'SAP',abbr:'SAP',domain:'Tech/ERP',hq:'Walldorf, DE',roles:'Dev, Consultant, PM'},
+  {name:'Capgemini',abbr:'CAP',domain:'Consulting',hq:'Paris, FR',roles:'Analyst, Dev, QA'},
+  {name:'HCL',abbr:'HCL',domain:'IT Services',hq:'Noida, IN',roles:'SWE, Dev, Testing'},
+  {name:'Adobe',abbr:'ADBE',domain:'Tech',hq:'San Jose, US',roles:'SWE, Design, DS'},
+  {name:'Salesforce',abbr:'CRM',domain:'Tech/CRM',hq:'San Francisco, US',roles:'SWE, Admin, PM'},
+  {name:'Nvidia',abbr:'NVDA',domain:'Tech/AI',hq:'Santa Clara, US',roles:'SWE, ML, HW'},
+  {name:'Qualcomm',abbr:'QCOM',domain:'Tech/Chips',hq:'San Diego, US',roles:'SWE, VLSI, Firmware'},
+];
+const DOMAINS=[...new Set(MNCS.map(m=>m.domain.split('/')[0]))];
+let picked=new Set();
+let domainFilter='All';
+let K={};
+let allResults=[];
+
+function saveKeys(){
+  K.g=document.getElementById('k-g').value.trim();
+  K.s=document.getElementById('k-s').value.trim();
+  K.gm=document.getElementById('k-gm').value.trim();
+  K.ge=document.getElementById('k-ge').value.trim();
+  document.getElementById('dg').className='dot '+(K.g?'don':'doff');
+  document.getElementById('ds').className='dot '+(K.s?'don':'doff');
+  document.getElementById('dgm').className='dot '+(K.gm?'don':'doff');
+  checkHuntBtn();
+  checkRwBtn();
+}
+
+function checkHuntBtn(){
+  K.g=K.g||document.getElementById('k-g').value.trim();
+  document.getElementById('hunt-btn').disabled=!(K.g&&picked.size>0);
+}
+function checkRwBtn(){
+  K.g=K.g||document.getElementById('k-g').value.trim();
+  const has=document.getElementById('res-input').value.trim().length>20;
+  document.getElementById('rw-btn').disabled=!(K.g&&has);
+}
+document.getElementById('res-input').addEventListener('input',checkRwBtn);
+document.getElementById('k-g').addEventListener('input',()=>{checkHuntBtn();checkRwBtn();});
+
+function switchMain(t){
+  ['jobs','resume'].forEach(id=>{
+    document.getElementById('tab-'+id).style.display=id===t?'block':'none';
+    document.getElementById('mt-'+id).className='tmain'+(id===t?' on':'');
+  });
+}
+
+function buildMncGrid(){
+  const grid=document.getElementById('mnc-grid');
+  grid.innerHTML='';
+  const visible=domainFilter==='All'?MNCS:MNCS.filter(m=>m.domain.includes(domainFilter));
+  visible.forEach(m=>{
+    const d=document.createElement('div');
+    d.className='mnc-item'+(picked.has(m.name)?' picked':'');
+    d.innerHTML=`<div class="mnc-name">${m.abbr} — ${m.name}</div><div class="mnc-sub">${m.hq} · ${m.domain}</div>`;
+    d.onclick=()=>{
+      if(picked.has(m.name))picked.delete(m.name);
+      else picked.add(m.name);
+      d.className='mnc-item'+(picked.has(m.name)?' picked':'');
+      document.getElementById('hunt-btn').innerHTML=`<i class="ti ti-radar-2" aria-hidden="true"></i> Hunt ${picked.size} MNC${picked.size!==1?'s':''} for fresher jobs`;
+      checkHuntBtn();
+    };
+    grid.appendChild(d);
+  });
+}
+
+function buildDomainFilters(){
+  const wrap=document.getElementById('domain-filters');
+  wrap.innerHTML='';
+  ['All',...DOMAINS].forEach(d=>{
+    const b=document.createElement('button');
+    b.className='fchip'+(d===domainFilter?' sel':'');
+    b.textContent=d;
+    b.onclick=()=>{domainFilter=d;buildDomainFilters();buildMncGrid();};
+    wrap.appendChild(b);
+  });
+}
+
+function getProfile(){
+  return{
+    name:document.getElementById('p-name').value.trim()||'[Your Name]',
+    deg:document.getElementById('p-deg').value.trim()||'B.Tech',
+    col:document.getElementById('p-col').value.trim()||'[College]',
+    cgpa:document.getElementById('p-cgpa').value.trim()||'',
+    skills:document.getElementById('p-skills').value.trim()||'',
+    role:document.getElementById('p-role').value.trim()||'Software Engineer',
+    li:document.getElementById('p-li').value.trim()||'',
+    gh:document.getElementById('p-gh').value.trim()||'',
+    proj:document.getElementById('p-proj').value.trim()||''
+  };
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function initials(n){return(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+
+async function doHunt(){
+  if(!K.g||!picked.size)return;
+  const p=getProfile();
+  const names=[...picked];
+  document.getElementById('hunt-err').innerHTML='';
+  document.getElementById('hunt-progress').style.display='block';
+  document.getElementById('pbar').style.width='0%';
+  document.getElementById('hunt-results').innerHTML='<div class="empty"><div class="spinner" style="margin:0 auto 12px;"></div><br>AI is hunting jobs at '+names.join(', ')+'…</div>';
+  document.getElementById('hunt-btn').disabled=true;
+  allResults=[];
+
+  try{
+    let webCtx='';
+    if(K.s){
+      try{
+        const q=names.slice(0,5).join(' OR ')+' fresher graduate hiring 2024 2025 entry level';
+        const r=await fetch('https://google.serper.dev/search',{method:'POST',headers:{'X-API-KEY':K.s,'Content-Type':'application/json'},body:JSON.stringify({q,num:8})});
+        const d=await r.json();
+        webCtx=(d.organic||[]).map(i=>i.title+' '+i.snippet).join('\n').slice(0,3000);
+      }catch(e){}
+    }
+    document.getElementById('pbar').style.width='30%';
+
+    const prompt=`You are a B2B job intelligence engine specialising in MNCs hiring freshers/graduates.
+
+Companies to research: ${names.join(', ')}
+Fresher profile: ${p.name}, ${p.deg} from ${p.col}${p.cgpa?' ('+p.cgpa+')':''}, skills: ${p.skills}, target role: ${p.role}
+${webCtx?'Web context:\n'+webCtx+'\n':''}
+
+Return ONLY valid JSON array (no markdown, no backticks). Each element:
+{
+  "company": "Company Name",
+  "is_hiring_freshers": true,
+  "open_roles": ["role1","role2","role3"],
+  "careers_url": "https://...",
+  "hq": "City, Country",
+  "company_size": "employees range",
+  "fresher_package": "CTC range if known e.g. 6-12 LPA",
+  "application_tip": "one specific tip for this company",
+  "hr_contacts": [
+    {
+      "name": "realistic HR name",
+      "title": "Talent Acquisition / HR Manager / Campus Recruiter",
+      "email": "realistic email pattern e.g. firstname.lastname@company.com",
+      "email_confidence": "high|medium|low",
+      "linkedin": "linkedin url or unknown",
+      "focus": "campus hiring / tech recruiting / graduate programs"
+    }
+  ],
+  "cold_email": {
+    "subject": "catchy personalised subject referencing company and role",
+    "body": "Write a full 180-220 word professional warm email from ${p.name} (fresher, ${p.deg} from ${p.col}) applying for ${p.role} at this specific company. Mention: specific skills (${p.skills}), one project/achievement (${p.proj||'strong academic background'}), genuine reason they want THIS specific company (not a generic line). Soft CTA. Signature with LinkedIn ${p.li} and portfolio ${p.gh}."
+  }
+}
+
+Generate for ALL ${names.length} companies. 2 HR contacts per company. Make emails feel human and specific to each company's culture. Return valid JSON array only.`;
+
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${K.g}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:3500}})});
+    if(!r.ok){const e=await r.json();throw new Error('Gemini: '+(e.error?.message||r.status));}
+    const d=await r.json();
+    const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const clean=text.replace(/```json|```/g,'').trim();
+    allResults=JSON.parse(clean);
+    document.getElementById('pbar').style.width='100%';
+    renderHuntResults(allResults);
+  }catch(err){
+    document.getElementById('hunt-results').innerHTML='';
+    document.getElementById('hunt-err').innerHTML='<div class="err-box"><i class="ti ti-alert-circle" aria-hidden="true"></i> '+esc(err.message)+'</div>';
+  }
+  document.getElementById('hunt-btn').disabled=false;
+  setTimeout(()=>{document.getElementById('hunt-progress').style.display='none';},600);
+}
+
+let sentMap={};
+
+function renderHuntResults(results){
+  if(!results.length){document.getElementById('hunt-results').innerHTML='<div class="empty">No results. Try different MNCs.</div>';return;}
+  let html='';
+  results.forEach((co,ci)=>{
+    const hr=co.hr_contacts||[];
+    const em=co.cold_email||{};
+    html+=`<div class="jcard">
+      <div class="jcard-top">
+        <div class="logo-box">${co.company.slice(0,3).toUpperCase()}</div>
+        <div style="flex:1;">
+          <div class="jname">${esc(co.company)}</div>
+          <div class="jrole">${esc(co.hq)} · ${esc(co.company_size||'')}</div>
+          <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap;">
+            ${co.is_hiring_freshers?'<span class="badge bg">Hiring freshers</span>':''}
+            ${co.fresher_package?`<span class="badge bb">${esc(co.fresher_package)}</span>`:''}
+            ${(co.open_roles||[]).slice(0,3).map(r=>`<span class="badge ba">${esc(r)}</span>`).join('')}
+          </div>
+        </div>
+        ${co.careers_url?`<a href="${esc(co.careers_url)}" style="font-size:11px;color:var(--color-text-info);flex-shrink:0;" target="_blank"><i class="ti ti-external-link" aria-hidden="true"></i> Careers</a>`:''}
+      </div>
+      ${co.application_tip?`<div class="info-row" style="margin-bottom:8px;"><i class="ti ti-bulb" aria-hidden="true" style="font-size:13px;"></i><span style="font-style:italic;color:var(--color-text-secondary);font-size:12px;">${esc(co.application_tip)}</span></div>`:''}
+      ${hr.map((h,hi)=>`
+      <div style="border-top:0.5px solid var(--color-border-tertiary);margin:8px 0;padding-top:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:#E6F1FB;color:#0C447C;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;">${initials(h.name)}</div>
+          <div>
+            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);">${esc(h.name)}</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);">${esc(h.title)} · ${esc(h.focus||'')}</div>
+          </div>
+          <span class="badge ${h.email_confidence==='high'?'bg':h.email_confidence==='medium'?'ba':'bb'}" style="margin-left:auto;">${esc(h.email_confidence)}</span>
+          ${sentMap[ci+'-'+hi]?'<span class="badge bg"><i class="ti ti-check" aria-hidden="true"></i> Sent</span>':''}
+        </div>
+        <div class="info-row"><i class="ti ti-mail" aria-hidden="true" style="font-size:13px;"></i><span class="v" style="font-family:var(--font-mono);font-size:11px;">${esc(h.email)}</span><button class="copy-btn" style="font-size:10px;padding:1px 5px;border:0.5px solid var(--color-border-secondary);border-radius:3px;background:none;cursor:pointer;color:var(--color-text-secondary);margin-left:4px;" onclick="navigator.clipboard.writeText('${esc(h.email)}')">copy</button></div>
+        ${h.linkedin&&h.linkedin!=='unknown'?`<div class="info-row"><i class="ti ti-brand-linkedin" aria-hidden="true" style="font-size:13px;"></i><a href="${esc(h.linkedin)}" style="color:var(--color-text-info);font-size:11px;">View LinkedIn</a></div>`:''}
+      </div>`).join('')}
+      <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--color-border-tertiary);">
+        <div class="subj-lbl">Email subject</div>
+        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px;" id="subj-${ci}">${esc(em.subject||'Application for fresher role')}</div>
+        <div class="subj-lbl">Email body <span style="font-weight:400;">(click to edit)</span></div>
+        <div class="draft-box" id="draft-${ci}" contenteditable="true">${esc(em.body||'')}</div>
+        <div class="action-row">
+          <button class="act" onclick="navigator.clipboard.writeText(document.getElementById('draft-${ci}').innerText)"><i class="ti ti-copy" aria-hidden="true"></i> Copy</button>
+          <button class="act" onclick="regenCompanyEmail(${ci},'${esc(co.company)}')"><i class="ti ti-refresh" aria-hidden="true"></i> Regen ↗</button>
+          <button class="act" onclick="useInResume('${esc(co.company)}','${esc((co.open_roles||[])[0]||'')}')"><i class="ti ti-file-text" aria-hidden="true"></i> Tailor resume ↗</button>
+          <button class="send-btn" id="sbtn-${ci}" onclick="sendEmail(${ci},'${esc(hr[0]?.email||'')}','${esc(em.subject||'')}')"><i class="ti ti-send" aria-hidden="true"></i> Send via Gmail</button>
+        </div>
+        <div id="sstatus-${ci}"></div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('hunt-results').innerHTML=html;
+}
+
+async function regenCompanyEmail(ci,company){
+  const p=getProfile();
+  const prompt=`Write a fresh, different, warm professional cold email from ${p.name} (fresher, ${p.deg} from ${p.col}) to an HR recruiter at ${company} for ${p.role} role. Skills: ${p.skills}. Project: ${p.proj}. LinkedIn: ${p.li}. Portfolio: ${p.gh}. 180-220 words. Specific to ${company}'s culture. Return only the email body, no subject.`;
+  document.getElementById('draft-'+ci).innerText='Regenerating…';
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${K.g}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.75,maxOutputTokens:600}})});
+    const d=await r.json();
+    document.getElementById('draft-'+ci).innerText=d.candidates?.[0]?.content?.parts?.[0]?.text?.trim()||'Error';
+  }catch(e){document.getElementById('draft-'+ci).innerText='Error: '+e.message;}
+}
+
+function useInResume(company,role){
+  document.getElementById('res-role').value=(role||'SWE')+' at '+company;
+  switchMain('resume');
+  document.getElementById('res-input').scrollIntoView({behavior:'smooth'});
+}
+
+async function sendEmail(ci,toEmail,subject){
+  if(!K.gm){document.getElementById('sstatus-'+ci).innerHTML='<div class="err-box" style="margin-top:6px;">No Gmail token. Add in API keys above.</div>';return;}
+  if(!toEmail){document.getElementById('sstatus-'+ci).innerHTML='<div class="err-box" style="margin-top:6px;">No email address found.</div>';return;}
+  const body=document.getElementById('draft-'+ci).innerText;
+  const subj=document.getElementById('subj-'+ci).innerText||subject;
+  const btn=document.getElementById('sbtn-'+ci);
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner" style="width:13px;height:13px;border-color:rgba(255,255,255,0.4);border-top-color:#fff;"></div>';
+  try{
+    const raw=makeRaw(K.ge||'me',toEmail,subj,body);
+    const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{'Authorization':'Bearer '+K.gm,'Content-Type':'application/json'},body:JSON.stringify({raw})});
+    if(r.ok){
+      sentMap[ci]=true;
+      document.getElementById('sstatus-'+ci).innerHTML='<div class="ok-box" style="margin-top:6px;"><i class="ti ti-check" aria-hidden="true"></i> Sent to '+esc(toEmail)+'!</div>';
+      btn.innerHTML='<i class="ti ti-check" aria-hidden="true"></i> Sent!';
+      btn.style.background='#3B6D11';
+    }else{const e=await r.json();throw new Error(e.error?.message||'Send failed '+r.status);}
+  }catch(err){
+    document.getElementById('sstatus-'+ci).innerHTML='<div class="err-box" style="margin-top:6px;">'+esc(err.message)+'</div>';
+    btn.disabled=false;
+    btn.innerHTML='<i class="ti ti-send" aria-hidden="true"></i> Send via Gmail';
+  }
+}
+
+function makeRaw(from,to,subject,body){
+  const msg=['From: '+from,'To: '+to,'Subject: '+subject,'MIME-Version: 1.0','Content-Type: text/plain; charset=utf-8','',body].join('\r\n');
+  return btoa(unescape(encodeURIComponent(msg))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+async function rewriteResume(){
+  const raw=document.getElementById('res-input').value.trim();
+  const targetRole=document.getElementById('res-role').value.trim();
+  const p=getProfile();
+  if(!raw||!K.g)return;
+  document.getElementById('res-output').innerText='Rewriting…';
+  document.getElementById('rw-btn').disabled=true;
+  document.getElementById('rw-btn').innerHTML='<div class="spinner" style="width:14px;height:14px;"></div> Rewriting…';
+  document.getElementById('copy-res-btn').style.display='none';
+  document.getElementById('dl-res-btn').style.display='none';
+  document.getElementById('res-changes').style.display='none';
+
+  const prompt=`You are an expert resume writer specialising in MNC/big-tech hiring for freshers.
+
+Target role: "${targetRole||p.role}"
+Candidate: ${p.name}, ${p.deg} from ${p.col}${p.cgpa?' ('+p.cgpa+')':''}, skills: ${p.skills}
+
+Original resume:
+${raw}
+
+Task: Completely rewrite and optimise this resume for the target role. Rules:
+1. Use strong action verbs (Built, Developed, Engineered, Designed, Implemented, Optimised, Led, Achieved)
+2. Quantify every achievement possible (add realistic metrics if missing — e.g. "reduced load time by 40%", "processed 10k records/sec")
+3. Add ATS keywords specific to the target role and company
+4. Reorder sections: Summary → Education → Skills → Projects → Experience (if any) → Achievements
+5. Write a punchy 2-line professional summary at top
+6. Make skills section keyword-rich for ATS
+7. Keep it to 1 page equivalent
+8. Make every bullet point impactful — no weak phrases like "worked on" or "helped with"
+
+Return JSON only (no backticks):
+{
+  "rewritten": "full rewritten resume text with proper formatting using --- section dividers",
+  "changes": ["change 1","change 2","change 3","change 4","change 5"]
+}`;
+
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${K.g}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:2000}})});
+    if(!r.ok){const e=await r.json();throw new Error('Gemini: '+(e.error?.message||r.status));}
+    const d=await r.json();
+    const text=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    const clean=text.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    document.getElementById('res-output').innerText=parsed.rewritten||'Error parsing result';
+    if(parsed.changes&&parsed.changes.length){
+      document.getElementById('res-changes').style.display='block';
+      document.getElementById('changes-content').innerHTML='<div style="font-size:11px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px;">What AI changed:</div><ul style="padding-left:16px;">'+parsed.changes.map(c=>`<li>${esc(c)}</li>`).join('')+'</ul>';
+    }
+    document.getElementById('copy-res-btn').style.display='flex';
+    document.getElementById('dl-res-btn').style.display='flex';
+  }catch(err){
+    document.getElementById('res-output').innerText='Error: '+err.message;
+  }
+  document.getElementById('rw-btn').disabled=false;
+  document.getElementById('rw-btn').innerHTML='<i class="ti ti-wand" aria-hidden="true"></i> Rewrite & optimise';
+}
+
+function copyResume(){
+  navigator.clipboard.writeText(document.getElementById('res-output').innerText);
+}
+
+function downloadResume(){
+  const text=document.getElementById('res-output').innerText;
+  const a=document.createElement('a');
+  a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(text);
+  a.download='resume_optimised.txt';
+  a.click();
+}
+
+buildDomainFilters();
+buildMncGrid();
+</script>

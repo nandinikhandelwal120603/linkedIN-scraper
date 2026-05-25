@@ -1,0 +1,12 @@
+node_modules/
+.env
+backend/.env
+frontend/dist/
+frontend/build/
+.DS_Store
+outreach_log.json
+outreach_leads_export.csv
+*.webp
+*.png
+*.jpg
+*.jpeg

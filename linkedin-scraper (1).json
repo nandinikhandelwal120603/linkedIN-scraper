@@ -1,0 +1,639 @@
+{
+  "name": "linkedin-scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cc27b2d9-8de7-43ca-a741-2d150084f78e",
+              "name": "currentStartIndex",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "fc552c57-4510-4f04-aa09-2294306d0d9f",
+              "name": "maxPages",
+              "value": 10,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1840,
+        400
+      ],
+      "id": "2c6560d9-47b6-4056-98ed-83f6d7656629",
+      "name": "Set Fields"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/customsearch/v1",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "enter your key here "
+            },
+            {
+              "name": "cx",
+              "value": "enter cx value here "
+            },
+            {
+              "name": "q",
+              "value": "site:linkedin.com/posts (\"looking for\" OR \"hiring\" OR \"seeking\") (\"developer\" OR \"freelancer\" OR \"agency\") (\"build an app\" OR \"build a saas\" OR \"mvp\" OR \"internal tool\" OR \"automation\") after:2025-12-01"
+            },
+            {
+              "name": "start",
+              "value": "={{ $runIndex == 0 ? $node[\"Set Fields\"].json.currentStartIndex : $node[\"Pagination Check\"].json.startIndex }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1664,
+        400
+      ],
+      "id": "f73d1a40-dcad-45de-9c00-199a76d6ec12",
+      "name": "Search Google"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the response data from the Google Search node\nconst response = $input.first().json;\nconst items = response.items || [];\n\n// --- PAGINATION LOGIC (UNCHANGED) ---\nlet nextStartIndex = 1;\nlet hasMoreResults = false;\n\nif (response.queries && response.queries.nextPage && response.queries.nextPage[0]) {\n  nextStartIndex = response.queries.nextPage[0].startIndex;\n  hasMoreResults = nextStartIndex <= 100; // Google API safety limit\n}\n\n// --- HELPER: EXTRACT PROFILE URL FROM POST URL ---\nfunction extractProfileUrl(postUrl) {\n  if (!postUrl) return \"\";\n\n  // Example:\n  // https://www.linkedin.com/posts/username_some-text\n  const match = postUrl.match(/linkedin\\.com\\/posts\\/([^_\\/]+)/);\n\n  if (match && match[1]) {\n    return `https://www.linkedin.com/in/${match[1]}`;\n  }\n\n  return \"\";\n}\n\n// --- HELPER: EXTRACT DATE FROM SNIPPET ---\nfunction extractDate(snippet) {\n  if (!snippet) return \"Recent\";\n\n  // Matches: \"Jan 9, 2026\" / \"Sep 22, 2025\"\n  const dateMatch = snippet.match(/^[A-Za-z]{3}\\s\\d{1,2},\\s\\d{4}/);\n  return dateMatch ? dateMatch[0] : \"Recent\";\n}\n\n// --- DATA PREPARATION (MATCHES GOOGLE SHEET COLUMNS) ---\nconst results = items.map(item => {\n  const postUrl = item.link || \"\";\n  const postText = item.snippet || \"\";\n\n  return {\n    \"Date Posted\": extractDate(postText),\n    \"Profile URL\": extractProfileUrl(postUrl),\n    \"Summary\": postText,\n    \"Post URL\": postUrl,\n\n    // Pagination data (required downstream)\n    startIndex: nextStartIndex,\n    hasMoreResults: hasMoreResults\n  };\n});\n\n// --- EMPTY STATE HANDLING ---\nif (results.length === 0) {\n  return [{\n    json: {\n      \"Date Posted\": \"N/A\",\n      \"Profile URL\": \"\",\n      \"Summary\": \"\",\n      \"Post URL\": \"\",\n      startIndex: 1,\n      hasMoreResults: false\n    }\n  }];\n}\n\n// Return clean items\nreturn results.map(r => ({ json: r }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        400
+      ],
+      "id": "24d6dbdd-4442-4014-be45-173113778871",
+      "name": "Extract Results"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1OVwbrDxL12bNHxNNyr0ATENKCR-gWxtjQzVIYyffAvg",
+          "mode": "list",
+          "cachedResultName": "linkedin_scraper_1.0",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OVwbrDxL12bNHxNNyr0ATENKCR-gWxtjQzVIYyffAvg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1364897360,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OVwbrDxL12bNHxNNyr0ATENKCR-gWxtjQzVIYyffAvg/edit#gid=1364897360"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date Posted": "={{ $('Extract Results').item.json['Date Posted'] }}",
+            "Profile URL": "={{ $('Extract Results').item.json['Profile URL'] }}",
+            "Summary": "={{ $json.text }}",
+            "Post URL": "={{ $('Extract Results').item.json['Post URL'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date Posted",
+              "displayName": "Date Posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Profile URL",
+              "displayName": "Profile URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Post URL",
+              "displayName": "Post URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1328,
+        400
+      ],
+      "id": "b0f7bebe-876b-46e9-b52c-e43e9810a569",
+      "name": "Add to Google",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "I7DGgAPAcBEACoLU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items from previous node\nconst inputItems = $input.all();\nconsole.log(\"Input items count:\", inputItems.length);\n\n// Defaults\nlet nextStartIndex = 1;\nlet hasMoreResults = false;\n\n// Safely extract pagination info\nif (inputItems.length > 0 && inputItems[0].json) {\n  const data = inputItems[0].json;\n\n  // Preferred fields\n  if (typeof data.startIndex === \"number\") {\n    nextStartIndex = data.startIndex;\n  } else if (typeof data.index === \"number\") {\n    nextStartIndex = data.index;\n  }\n\n  if (typeof data.hasMoreResults === \"boolean\") {\n    hasMoreResults = data.hasMoreResults;\n  } else if (typeof data.results === \"boolean\") {\n    hasMoreResults = data.results;\n  }\n}\n\nconsole.log(\"Next startIndex:\", nextStartIndex);\nconsole.log(\"Has more results:\", hasMoreResults);\n\n// n8n REQUIRES an array return\nreturn [\n  {\n    json: {\n      continueLoop: hasMoreResults,\n      startIndex: nextStartIndex\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        400
+      ],
+      "id": "7a9063c7-dbd6-4a7e-9057-64c9b1cb1db5",
+      "name": "Pagination"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "faef2862-80a4-465b-9e0b-be5b9753dcbd",
+              "leftValue": "={{ $json.continueLoop }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2368,
+        400
+      ],
+      "id": "52b75ba4-3d61-4ea9-8a4a-384cf71bd92e",
+      "name": "Pagination Check"
+    },
+    {
+      "parameters": {
+        "content": "## Google API Instructions\n\n1. Go to [Google Cloud Console](https://console.cloud.google.com/)\n   - Create a new project  \n   - Enable **Custom Search API**  \n   - Go to **Credentials** and copy your **API Key**\n\n2. Go to [Programmable Search Engine](https://programmablesearchengine.google.com/controlpanel/create)\n   - Create a name  \n   - Select **Search entire web**  \n   - Copy the **cx** value\n\n## Usage Limits (Free Tier)\n\n- The free tier of the Google Custom Search API allows **100 requests per day**\n- Each request returns **up to 10 search results**\n- This means you can get **up to 1,000 search results per day** at no cost\n",
+        "height": 500,
+        "width": 360,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        208
+      ],
+      "id": "03badd03-b39f-4d1d-8ee9-5b2b6c141427",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2032,
+        400
+      ],
+      "id": "3e99c60f-3d98-478f-b4aa-b115f6ef802c",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0bcc5fa1-70df-415a-aad5-e337b15391ab",
+              "name": "post_text_lower",
+              "value": "={{ ($json[\"Summary\"] || \"\").toLowerCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1104,
+        400
+      ],
+      "id": "6e5eb32a-b0a9-489e-bfe3-6f72484e150e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ad133bbe-cb68-43e2-9b64-42ad6b4b72a7",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "looking for",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "ef7e1081-35eb-47b1-958b-95e0beb1d047",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "hiring",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "4b70641a-e9bf-4f37-949a-47e7bb66bd61",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "need",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "37e4b6d3-6255-4d75-918b-1291b2d82d73",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "seeking",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "b387a866-3a18-4779-82ad-3d3af35bd72a",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "contract",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "edf11c0c-8587-42ff-a476-af7d9b4e008c",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "opportunity",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "3e744ebc-6c3b-447d-b92e-e62cdf212594",
+              "leftValue": "={{ $json.post_text_lower }}",
+              "rightValue": "build a saas",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -896,
+        400
+      ],
+      "id": "9d88939d-576e-4603-b88c-aea43acc9707",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a strict B2B Lead Qualifier.\nAnalyze the text below.\n\nYour Goal:\nIdentify if the author is a \"BUYER\" (someone looking to hire a developer/agency to build something) or a \"SELLER\" (a freelancer looking for work).\n\nCriteria for \"YES\":\n- Author explicitly says \"looking for a developer\", \"hiring\", \"need to build\", \"seeking co-founder\".\n- Author has a specific project (App, MVP, SaaS, Tool) they need help with.\n\nCriteria for \"NO\":\n- Author says \"I am a developer looking for work\".\n- Author is sharing a tutorial, opinion, or news.\n- Author is asking for career advice.\n- The post is promotional junk.\n\nPost Text:\n{{ $('Extract Results').item.json.Summary }}\nOutput:\nReply with ONLY the word \"YES\" if they are a BUYER.\nReply with ONLY the word \"NO\" for everything else.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.8,
+      "position": [
+        -688,
+        304
+      ],
+      "id": "72ae9510-3e42-4921-a9fe-b92816c0710e",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        144
+      ],
+      "id": "c70443c7-154e-449c-ab20-e4ab13da0790",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PLTUUraYofz4R1z3",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b6692e8c-d19d-46a7-90c0-655741d5eb0a",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "YES",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "6f64498f-6f88-4871-a8da-f338caa3af6b",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "YES,",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -336,
+        304
+      ],
+      "id": "9d8e234e-665e-45f7-b38e-18edaf0bd558",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Summarize the following lead in one concise sentence.\nInclude:\n1. What they are building (App/SaaS/Tool).\n2. The specific tech stack or role they need (e.g., \"React Developer\", \"Automation Expert\").\n3. Any mention of budget or urgency.\n\nKeep it under 20 words.\n\nPost:\n{{ $('Extract Results').item.json.Summary }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.8,
+      "position": [
+        16,
+        224
+      ],
+      "id": "452d62e6-8fec-4aed-bd34-3b46dc51057d",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "dfd38090-b64a-4719-a784-dffb049cd84e",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PLTUUraYofz4R1z3",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Search Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Google": {
+      "main": [
+        [
+          {
+            "node": "Extract Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Results": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Google": {
+      "main": [
+        [
+          {
+            "node": "Pagination",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pagination": {
+      "main": [
+        [
+          {
+            "node": "Pagination Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pagination Check": {
+      "main": [
+        [
+          {
+            "node": "Search Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Add to Google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "110bc37a-08d7-4db4-93e4-3c2b02665d19",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "563936cc66aff4deaf0109d4cc9a4e576149a0cb06c35dfa129e94f29b5b8b93"
+  },
+  "id": "KDsic-HtqH4U02Mh8KLa6",
+  "tags": []
+}
