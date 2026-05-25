@@ -7,6 +7,7 @@ export default function App() {
   // API Keys (Persistent)
   const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('outreach_gemini_key') || '');
   const [serperKey, setSerperKey] = useState(() => localStorage.getItem('outreach_serper_key') || '');
+  const [useGmailApi, setUseGmailApi] = useState(() => localStorage.getItem('outreach_use_gmail_api') === 'true');
   
   // User Profile (Persistent)
   const [profile, setProfile] = useState(() => {
@@ -60,6 +61,10 @@ export default function App() {
   }, [serperKey]);
 
   useEffect(() => {
+    localStorage.setItem('outreach_use_gmail_api', useGmailApi ? 'true' : 'false');
+  }, [useGmailApi]);
+
+  useEffect(() => {
     localStorage.setItem('outreach_user_profile', JSON.stringify(profile));
   }, [profile]);
 
@@ -95,6 +100,20 @@ export default function App() {
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfile(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleConnectGmail = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth`);
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Failed to get Google authorization URL: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Error connecting to auth function: " + err.message);
+    }
   };
 
   const saveSettings = (e) => {
@@ -438,49 +457,81 @@ export default function App() {
     }));
   };
 
-  // Trigger Send: Opens Gmail compose URL in new tab & marks status as "sent" & logs to backend
+  // Trigger Send: Dispatches via Gmail API if enabled, otherwise opens compose link
   const handleSendEmail = async (contactId) => {
     const contact = contacts.find(c => c.id === contactId);
     if (!contact) return;
 
-    // 1. Open Gmail Compose Tab
-    if (contact.gmail_compose_url) {
-      window.open(contact.gmail_compose_url, '_blank');
+    let success = true;
+    let errMsg = '';
+
+    if (useGmailApi) {
+      setIsLoading(true);
+      setLoadingStep('Sending email via Gmail API...');
+      try {
+        const response = await fetch(`${API_BASE_URL}/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: contact.hr_email,
+            subject: contact.subject,
+            body: contact.body
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to dispatch email');
+        }
+        alert('Email sent successfully via Gmail API!');
+      } catch (err) {
+        success = false;
+        errMsg = err.message;
+        alert('Failed to send email via API: ' + err.message);
+      } finally {
+        setIsLoading(false);
+        setLoadingStep('');
+      }
     } else {
-      // Fallback manual mailto
-      window.open(`mailto:${contact.hr_email}?subject=${encodeURIComponent(contact.subject)}&body=${encodeURIComponent(contact.body)}`, '_blank');
+      // Traditional compose redirect
+      if (contact.gmail_compose_url) {
+        window.open(contact.gmail_compose_url, '_blank');
+      } else {
+        window.open(`mailto:${contact.hr_email}?subject=${encodeURIComponent(contact.subject)}&body=${encodeURIComponent(contact.body)}`, '_blank');
+      }
     }
 
-    // 2. Set timestamp and update local status to "sent"
-    const timestamp = new Date().toISOString();
-    setContacts(prev => prev.map(c => {
-      if (c.id === contactId) {
-        return {
-          ...c,
-          status: 'sent',
-          last_sent_at: timestamp
-        };
-      }
-      return c;
-    }));
+    if (success) {
+      // Set timestamp and update local status to "sent"
+      const timestamp = new Date().toISOString();
+      setContacts(prev => prev.map(c => {
+        if (c.id === contactId) {
+          return {
+            ...c,
+            status: 'sent',
+            last_sent_at: timestamp
+          };
+        }
+        return c;
+      }));
 
-    // 3. Log Outreach Attempt in Backend
-    try {
-      await fetch(`${API_BASE_URL}/log-attempt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: contact.id,
-          company: contact.company,
-          hr_name: contact.hr_name,
-          hr_email: contact.hr_email,
-          subject: contact.subject,
-          status: 'sent',
-          notes: contact.notes || 'Sent via Gmail trigger'
-        })
-      });
-    } catch (err) {
-      console.error('Failed to log outreach to backend:', err);
+      // Log Outreach Attempt in Backend
+      try {
+        await fetch(`${API_BASE_URL}/log-attempt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: contact.id,
+            company: contact.company,
+            hr_name: contact.hr_name,
+            hr_email: contact.hr_email,
+            subject: contact.subject,
+            status: 'sent',
+            notes: contact.notes || (useGmailApi ? 'Sent directly via Gmail API' : 'Sent via Gmail compose link')
+          })
+        });
+      } catch (err) {
+        console.error('Failed to log outreach to backend:', err);
+      }
     }
   };
 
@@ -587,8 +638,32 @@ export default function App() {
                 </p>
               </div>
             </div>
+
+            {/* Gmail Integration Section */}
+            <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1.25rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textTransform: 'none', fontWeight: '500' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={useGmailApi} 
+                      onChange={(e) => setUseGmailApi(e.target.checked)} 
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    Dispatch Outreach directly via Gmail API
+                  </label>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '4px', marginLeft: '24px' }}>
+                    Sends emails in one click using the backend integration instead of opening compose tabs.
+                  </p>
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={handleConnectGmail} style={{ padding: '0.5rem 1rem' }}>
+                  <i className="ti ti-brand-google" style={{ color: 'var(--accent-rose)' }}></i> Connect Gmail
+                </button>
+              </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button type="submit" className="btn btn-primary">Save Keys</button>
+              <button type="submit" className="btn btn-primary">Save Settings</button>
               <button type="button" className="btn btn-secondary" style={{ color: 'var(--accent-rose)' }} onClick={handleClearAll}>
                 <i className="ti ti-trash"></i> Reset Database
               </button>
