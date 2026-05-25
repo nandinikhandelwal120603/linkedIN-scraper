@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     }
 
     const promptText = buildAnalysisPrompt(replyText);
-    const raw = await callGemini(promptText, geminiKeyOverride);
+    const raw = await callGemini(promptText, geminiKeyOverride, '/api/analyze-reply');
     const parsed = safeParse(raw);
 
     if (!parsed || !parsed.intent || !parsed.next_action) {

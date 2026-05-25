@@ -81,7 +81,7 @@ export default async function handler(req, res) {
     }
 
     const promptText = buildPrompt(role, userProfile);
-    const raw = await callGemini(promptText, geminiKeyOverride);
+    const raw = await callGemini(promptText, geminiKeyOverride, '/api/generate');
     const parsed = safeParse(raw);
 
     // Validate structured response elements

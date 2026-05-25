@@ -5,6 +5,7 @@ frontend/dist/
 frontend/build/
 .DS_Store
 outreach_log.json
+backend/usage_log.json
 outreach_leads_export.csv
 *.webp
 *.png

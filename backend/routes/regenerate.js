@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     }
 
     const promptText = buildRegenPrompt(hrName, company, role, userProfile);
-    const raw = await callGemini(promptText, geminiKeyOverride);
+    const raw = await callGemini(promptText, geminiKeyOverride, '/api/regenerate');
     const parsed = safeParse(raw);
 
     if (!parsed || !parsed.subject || !parsed.body) {

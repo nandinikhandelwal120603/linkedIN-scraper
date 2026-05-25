@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     }
 
     const promptText = buildFollowupPrompt(hrName, company, role, userProfile, previousSubject, previousBody);
-    const raw = await callGemini(promptText, geminiKeyOverride);
+    const raw = await callGemini(promptText, geminiKeyOverride, '/api/followup');
     const parsed = safeParse(raw);
 
     if (!parsed || !parsed.subject || !parsed.body) {
