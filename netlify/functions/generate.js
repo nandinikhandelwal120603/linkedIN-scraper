@@ -2,7 +2,6 @@ import { callGemini } from "./utils/gemini.js";
 import { safeParse } from "./utils/parser.js";
 
 export async function handler(event) {
-  // CORS support
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -15,33 +14,56 @@ export async function handler(event) {
   }
 
   try {
-    const { role, userProfile } = JSON.parse(event.body);
+    const { role, profile } = JSON.parse(event.body);
 
     const prompt = `
-Generate companies + HR contacts + personalized cold emails.
+You are an expert cold outreach strategist and recruiter research agent.
+Your task is to identify top hiring companies (top 8-10 ONLY) matching the target role, generate realistic HR/recruiter contact entries, and craft high-converting cold outreach emails.
 
-Role: ${role}
-Profile: ${userProfile}
+TARGET ROLE:
+${role}
 
-Return strict JSON:
+CANDIDATE PROFILE:
+${JSON.stringify(profile)}
+
+STRICT RULES:
+1. Keep the output companies list limited to top 8-10 ONLY.
+2. For each company, provide 1 or 2 HR/recruiter contacts.
+3. Every email body must be under 120 words.
+4. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
+5. No begging tone, no long paragraphs, no resume-style listing.
+6. Tone: ${profile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+
+EMAIL STRUCTURE (MANDATORY):
+1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
+2. PROOF (1-2 lines): mention ONE strong project or result from candidate's projects that matches company stack/needs. Make it sound real, not buzzwords.
+3. VALUE (1 line): connect candidate's work to company's needs.
+4. CLOSE (1 line): soft but confident ask (e.g. "Worth a quick chat?").
+
+OUTPUT FORMAT (STRICT JSON):
 {
-  "companies":[
+  "companies": [
     {
-      "company_name":"",
-      "hr_contacts":[
+      "company_name": "string",
+      "industry": "string",
+      "reason_for_selection": "string",
+      "hr_contacts": [
         {
-          "name":"",
-          "email":"",
-          "email_confidence":"",
-          "email_content":{
-            "subject":"",
-            "body":""
+          "name": "string",
+          "email": "string",
+          "email_confidence": "high | medium | low",
+          "linkedin": "string",
+          "email_content": {
+            "subject": "string",
+            "body": "string"
           }
         }
       ]
     }
   ]
 }
+
+Now generate the output.
 `;
 
     const raw = await callGemini(prompt);
@@ -61,3 +83,4 @@ Return strict JSON:
     };
   }
 }
+

@@ -9,7 +9,7 @@ export default function App() {
   const [serperKey, setSerperKey] = useState(() => localStorage.getItem('outreach_serper_key') || '');
   const [useGmailApi, setUseGmailApi] = useState(() => localStorage.getItem('outreach_use_gmail_api') === 'true');
   
-  // User Profile (Persistent)
+  // User Profile (Persistent & Synced with Supabase)
   const [profile, setProfile] = useState(() => {
     const saved = localStorage.getItem('outreach_user_profile');
     return saved ? JSON.parse(saved) : {
@@ -21,7 +21,8 @@ export default function App() {
       targetRole: '',
       linkedin: '',
       github: '',
-      projects: ''
+      projects: '',
+      tone: 'confident, builder, not desperate'
     };
   });
 
@@ -51,6 +52,15 @@ export default function App() {
   const [historyLogs, setHistoryLogs] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // Send Guardrails States
+  const [autoSend, setAutoSend] = useState(() => localStorage.getItem('outreach_auto_send') === 'true');
+  const [dailyLimit] = useState(25);
+  const [cooldownTimer, setCooldownTimer] = useState(0);
+  const [isDelayActive, setIsDelayActive] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingSendContactId, setPendingSendContactId] = useState(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
   // --- PERSISTENCE EFFECT ---
   useEffect(() => {
     localStorage.setItem('outreach_gemini_key', geminiKey);
@@ -72,7 +82,17 @@ export default function App() {
     localStorage.setItem('outreach_contacts', JSON.stringify(contacts));
   }, [contacts]);
 
-  // Load history when tab is clicked
+  useEffect(() => {
+    localStorage.setItem('outreach_auto_send', autoSend ? 'true' : 'false');
+  }, [autoSend]);
+
+  // Load profile and history logs on startup
+  useEffect(() => {
+    fetchProfile();
+    fetchHistory();
+  }, []);
+
+  // Reload history when tab is clicked
   useEffect(() => {
     if (activeTab === 'history') {
       fetchHistory();
@@ -97,6 +117,52 @@ export default function App() {
 
   // --- ACTIONS ---
   
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/profile`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && data.profile) {
+        setProfile({
+          name: data.profile.name || '',
+          degree: data.profile.degree || '',
+          college: data.profile.college || '',
+          cgpa: data.profile.cgpa || '',
+          skills: data.profile.skills || '',
+          targetRole: data.profile.target_role || '',
+          linkedin: data.profile.linkedin || '',
+          github: data.profile.github || '',
+          projects: data.profile.projects || '',
+          tone: data.profile.tone || 'confident, builder, not desperate'
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load profile from Supabase:", err);
+    }
+  };
+
+  const saveProfileToDb = async (e) => {
+    if (e) e.preventDefault();
+    setIsSavingProfile(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Profile saved to Supabase successfully!");
+      } else {
+        throw new Error(data.error || "Unknown error");
+      }
+    } catch (err) {
+      alert("Failed to save profile: " + err.message);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfile(prev => ({ ...prev, [name]: value }));
@@ -127,7 +193,7 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE_URL}/history`);
       const result = await res.json();
-      if (result.success) {
+      if (result.success && result.data) {
         setHistoryLogs(result.data);
       }
     } catch (err) {
@@ -136,7 +202,6 @@ export default function App() {
       setHistoryLoading(false);
     }
   };
-
   // Main Agent Trigger: Discover & Generate Emails
   const handleStartDiscovery = async (e) => {
     e.preventDefault();
@@ -157,7 +222,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           role: searchRole,
-          userProfile: `Candidate: ${profile.name || 'Applicant'}. Degree: ${profile.degree || ''} from ${profile.college || ''} (${profile.cgpa || ''}). Skills: ${profile.skills || ''}. Projects: ${profile.projects || ''}. GitHub: ${profile.github || ''}. LinkedIn: ${profile.linkedin || ''}`,
+          profile: profile,
           geminiKeyOverride: geminiKey
         })
       });
@@ -253,7 +318,7 @@ export default function App() {
           hrName: contact.hr_name,
           company: contact.company,
           role: searchRole || profile.targetRole || 'Software Engineer',
-          userProfile: `Candidate: ${profile.name || 'Applicant'}. Degree: ${profile.degree || ''} from ${profile.college || ''} (${profile.cgpa || ''}). Skills: ${profile.skills || ''}. Projects: ${profile.projects || ''}. GitHub: ${profile.github || ''}. LinkedIn: ${profile.linkedin || ''}`,
+          profile: profile,
           geminiKeyOverride: geminiKey
         })
       });
@@ -340,7 +405,7 @@ export default function App() {
           hrName: contact.hr_name,
           company: contact.company,
           role: searchRole || profile.targetRole || 'Software Engineer',
-          userProfile: `Candidate: ${profile.name || 'Applicant'}. Degree: ${profile.degree || ''} from ${profile.college || ''} (${profile.cgpa || ''}). Skills: ${profile.skills || ''}. Projects: ${profile.projects || ''}. GitHub: ${profile.github || ''}. LinkedIn: ${profile.linkedin || ''}`,
+          profile: profile,
           previousSubject: contact.subject,
           previousBody: contact.body,
           geminiKeyOverride: geminiKey
@@ -458,9 +523,34 @@ export default function App() {
   };
 
   // Trigger Send: Dispatches via Gmail API if enabled, otherwise opens compose link
-  const handleSendEmail = async (contactId) => {
+  const handleSendEmail = async (contactId, isConfirmed = false) => {
     const contact = contacts.find(c => c.id === contactId);
     if (!contact) return;
+
+    // Check daily limit
+    const todayString = new Date().toDateString();
+    const sentToday = historyLogs.filter(log => {
+      const logDate = new Date(log.created_at || log.timestamp).toDateString();
+      return logDate === todayString && (log.status === 'sent' || log.status === 'replied' || log.status === 'interview');
+    }).length;
+
+    if (sentToday >= dailyLimit) {
+      alert(`Daily limit of ${dailyLimit} emails reached! Let's pause for today to maintain healthy domains.`);
+      return;
+    }
+
+    // Check delay cooldown
+    if (isDelayActive) {
+      alert(`Please wait for the cooldown timer (${cooldownTimer}s) to expire before sending another email.`);
+      return;
+    }
+
+    // Check confirmation modal (for manual review mode)
+    if (!autoSend && !isConfirmed) {
+      setPendingSendContactId(contactId);
+      setShowConfirmModal(true);
+      return;
+    }
 
     let success = true;
     let errMsg = '';
@@ -501,7 +591,6 @@ export default function App() {
     }
 
     if (success) {
-      // Set timestamp and update local status to "sent"
       const timestamp = new Date().toISOString();
       setContacts(prev => prev.map(c => {
         if (c.id === contactId) {
@@ -525,13 +614,168 @@ export default function App() {
             hr_name: contact.hr_name,
             hr_email: contact.hr_email,
             subject: contact.subject,
+            body: contact.body,
             status: 'sent',
             notes: contact.notes || (useGmailApi ? 'Sent directly via Gmail API' : 'Sent via Gmail compose link')
           })
         });
+        fetchHistory(); // Refresh logs to update sent count immediately
       } catch (err) {
         console.error('Failed to log outreach to backend:', err);
       }
+
+      // Start 25-second cooldown delay
+      setIsDelayActive(true);
+      let timeLeft = 25;
+      setCooldownTimer(timeLeft);
+      const interval = setInterval(() => {
+        timeLeft -= 1;
+        setCooldownTimer(timeLeft);
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          setIsDelayActive(false);
+        }
+      }, 1000);
+
+      // Auto-Send Flow
+      if (autoSend) {
+        const nextContact = contacts.find(c => c.id !== contactId && c.status === 'not_applied');
+        if (nextContact) {
+          // Trigger after the cooldown ends
+          setTimeout(() => {
+            handleSendEmail(nextContact.id);
+          }, 25500);
+        } else {
+          alert("Auto-Send completed! No more contacts to send.");
+        }
+      }
+    } else {
+      // Mark as failed
+      setContacts(prev => prev.map(c => {
+        if (c.id === contactId) {
+          return {
+            ...c,
+            status: 'failed',
+            notes: `Email failed — retry. Error: ${errMsg}`
+          };
+        }
+        return c;
+      }));
+
+      // Log Failed Attempt in Backend
+      try {
+        await fetch(`${API_BASE_URL}/log-attempt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: contact.id,
+            company: contact.company,
+            hr_name: contact.hr_name,
+            hr_email: contact.hr_email,
+            subject: contact.subject,
+            body: contact.body,
+            status: 'failed',
+            notes: `Failed: ${errMsg}`
+          })
+        });
+        fetchHistory();
+      } catch (err) {
+        console.error('Failed to log failure to backend:', err);
+      }
+    }
+  };
+
+  // Trigger Send for Follow-up email
+  const handleSendFollowup = async (contactId) => {
+    const contact = contacts.find(c => c.id === contactId);
+    if (!contact || !contact.followupSubject || !contact.followupBody) return;
+
+    // Check daily limit
+    const todayString = new Date().toDateString();
+    const sentToday = historyLogs.filter(log => {
+      const logDate = new Date(log.created_at || log.timestamp).toDateString();
+      return logDate === todayString && (log.status === 'sent' || log.status === 'replied' || log.status === 'interview');
+    }).length;
+
+    if (sentToday >= dailyLimit) {
+      alert(`Daily limit of ${dailyLimit} emails reached! Let's pause for today.`);
+      return;
+    }
+
+    // Check delay cooldown
+    if (isDelayActive) {
+      alert(`Please wait for the cooldown timer (${cooldownTimer}s) to expire before sending.`);
+      return;
+    }
+
+    let success = true;
+    let errMsg = '';
+
+    if (useGmailApi) {
+      setIsLoading(true);
+      setLoadingStep('Sending follow-up email via Gmail API...');
+      try {
+        const response = await fetch(`${API_BASE_URL}/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: contact.hr_email,
+            subject: contact.followupSubject,
+            body: contact.followupBody
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to dispatch follow-up email');
+        }
+        alert('Follow-up email sent successfully!');
+      } catch (err) {
+        success = false;
+        errMsg = err.message;
+        alert('Failed to send follow-up: ' + err.message);
+      } finally {
+        setIsLoading(false);
+        setLoadingStep('');
+      }
+    } else {
+      window.open(contact.followupGmailUrl, '_blank');
+    }
+
+    if (success) {
+      handleStatusChange(contactId, 'sent');
+
+      try {
+        await fetch(`${API_BASE_URL}/log-attempt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: contact.id + '-followup',
+            company: contact.company,
+            hr_name: contact.hr_name,
+            hr_email: contact.hr_email,
+            subject: contact.followupSubject,
+            body: contact.followupBody,
+            status: 'sent',
+            notes: 'Sent follow-up message.'
+          })
+        });
+        fetchHistory();
+      } catch (err) {
+        console.error('Failed to log follow-up:', err);
+      }
+
+      // Start 25-second cooldown delay
+      setIsDelayActive(true);
+      let timeLeft = 25;
+      setCooldownTimer(timeLeft);
+      const interval = setInterval(() => {
+        timeLeft -= 1;
+        setCooldownTimer(timeLeft);
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          setIsDelayActive(false);
+        }
+      }, 1000);
     }
   };
 
@@ -759,6 +1003,16 @@ export default function App() {
                   onChange={handleProfileChange}
                 />
               </div>
+              <div>
+                <label>Outreach Tone (Important)</label>
+                <input 
+                  type="text" 
+                  name="tone" 
+                  placeholder="e.g. confident, builder, not desperate" 
+                  value={profile.tone || ''} 
+                  onChange={handleProfileChange}
+                />
+              </div>
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
@@ -783,9 +1037,20 @@ export default function App() {
                 ></textarea>
               </div>
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-              💡 Profile updates are saved automatically. They supply context for tailoring cold emails to represent your skills authentically.
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                💡 Profile updates are saved locally and synced to your central database on save.
+              </p>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={saveProfileToDb} 
+                disabled={isSavingProfile}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+              >
+                {isSavingProfile ? 'Saving...' : 'Save to Supabase'}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -885,6 +1150,25 @@ export default function App() {
                 />
               </div>
             </div>
+
+            <div style={{ marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input 
+                type="checkbox" 
+                id="autoSendToggle"
+                checked={autoSend} 
+                onChange={(e) => setAutoSend(e.target.checked)} 
+                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+              />
+              <label htmlFor="autoSendToggle" style={{ margin: 0, textTransform: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                🚀 <strong>Auto Send Mode</strong> (Sends emails automatically with a 25s delay; uncheck for Review First)
+              </label>
+            </div>
+
+            {autoSend && !useGmailApi && (
+              <p style={{ color: 'var(--accent-amber)', fontSize: '0.8rem', marginTop: '-0.75rem', marginBottom: '1.25rem', paddingLeft: '4px' }}>
+                ⚠️ <strong>Note:</strong> Auto-Send is active but Gmail API is disabled. The system will open browser tabs with a 25s delay. Please allow pop-ups.
+              </p>
+            )}
             
             <button 
               type="submit" 
@@ -969,6 +1253,12 @@ export default function App() {
               <div style={{ borderLeft: '1px solid var(--border-medium)', paddingLeft: '1.5rem' }}>
                 <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Emails Sent</div>
                 <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--accent-emerald)' }}>{stats.sent}</div>
+              </div>
+              <div style={{ borderLeft: '1px solid var(--border-medium)', paddingLeft: '1.5rem' }}>
+                <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Sent Today</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: sentToday >= dailyLimit ? 'var(--accent-rose)' : 'var(--accent-emerald)' }}>
+                  {sentToday} / {dailyLimit}
+                </div>
               </div>
               <div style={{ borderLeft: '1px solid var(--border-medium)', paddingLeft: '1.5rem' }}>
                 <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>Replied</div>
@@ -1121,6 +1411,7 @@ export default function App() {
                 else if (c.status === 'replied') borderGlowClass = 'rgba(245, 158, 11, 0.2)';
                 else if (c.status === 'interview') borderGlowClass = 'rgba(139, 92, 246, 0.2)';
                 else if (c.status === 'invalid_contact') borderGlowClass = 'rgba(244, 63, 94, 0.2)';
+                else if (c.status === 'failed') borderGlowClass = 'rgba(244, 63, 94, 0.35)';
 
                 return (
                   <div 
@@ -1132,6 +1423,7 @@ export default function App() {
                         c.status === 'replied' ? 'var(--accent-amber)' :
                         c.status === 'interview' ? 'var(--accent-purple)' :
                         c.status === 'invalid_contact' ? 'var(--accent-rose)' :
+                        c.status === 'failed' ? 'var(--accent-rose)' :
                         'var(--accent-blue)'
                       }`,
                       boxShadow: borderGlowClass ? `0 0 15px ${borderGlowClass}` : undefined,
@@ -1175,6 +1467,7 @@ export default function App() {
                               c.status === 'replied' ? 'var(--accent-amber)' :
                               c.status === 'interview' ? 'var(--accent-purple)' :
                               c.status === 'invalid_contact' ? 'var(--accent-rose)' :
+                              c.status === 'failed' ? 'var(--accent-rose)' :
                               'var(--border-strong)'
                           }}
                         >
@@ -1183,6 +1476,7 @@ export default function App() {
                           <option value="replied">Replied</option>
                           <option value="interview">Interview Setup</option>
                           <option value="invalid_contact">Invalid / Bounce</option>
+                          <option value="failed">Failed — Retry</option>
                         </select>
 
                         <button 
@@ -1314,26 +1608,16 @@ export default function App() {
                             <div style={{ display: 'flex', gap: '6px' }}>
                               <button 
                                 className="btn btn-primary" 
-                                style={{ flex: 1, padding: '0.4rem', fontSize: '0.75rem', background: 'var(--accent-blue)' }}
-                                onClick={() => {
-                                  window.open(c.followupGmailUrl, '_blank');
-                                  handleStatusChange(c.id, 'sent');
-                                  fetch(`${API_BASE_URL}/log-attempt`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      id: c.id + '-followup',
-                                      company: c.company,
-                                      hr_name: c.hr_name,
-                                      hr_email: c.hr_email,
-                                      subject: c.followupSubject,
-                                      status: 'sent',
-                                      notes: 'Sent follow-up message.'
-                                    })
-                                  }).catch(err => console.error(err));
+                                style={{
+                                  flex: 1,
+                                  padding: '0.4rem',
+                                  fontSize: '0.75rem',
+                                  background: isDelayActive ? 'var(--bg-tertiary)' : 'var(--accent-blue)'
                                 }}
+                                onClick={() => handleSendFollowup(c.id)}
+                                disabled={isDelayActive}
                               >
-                                <i className="ti ti-brand-gmail"></i> Send Follow-up
+                                <i className="ti ti-brand-gmail"></i> {isDelayActive ? `Cooldown (${cooldownTimer}s)` : 'Send Follow-up'}
                               </button>
                               <button 
                                 className="btn btn-secondary" 
@@ -1491,14 +1775,14 @@ export default function App() {
                         <button 
                           className="btn btn-primary"
                           style={{
-                            background: c.status === 'sent' ? 'var(--accent-emerald)' : 'var(--accent-blue)',
-                            boxShadow: c.status === 'sent' ? '0 4px 14px rgba(16,185,129,0.3)' : undefined
+                            background: isDelayActive ? 'var(--bg-tertiary)' : (c.status === 'sent' ? 'var(--accent-emerald)' : (c.status === 'failed' ? 'var(--accent-rose)' : 'var(--accent-blue)')),
+                            boxShadow: !isDelayActive && c.status === 'sent' ? '0 4px 14px rgba(16,185,129,0.3)' : undefined
                           }}
                           onClick={() => handleSendEmail(c.id)}
-                          disabled={!c.hr_email}
+                          disabled={!c.hr_email || isDelayActive}
                         >
                           <i className="ti ti-send"></i> 
-                          {c.status === 'sent' ? 'Send Again (Compose Tab)' : 'Send Email (Compose Tab)'}
+                          {isDelayActive ? `Cooldown (${cooldownTimer}s)` : (c.status === 'sent' ? 'Send Again (Compose Tab)' : (c.status === 'failed' ? 'Retry Failed Send' : 'Send Email (Compose Tab)'))}
                         </button>
                       )}
                     </div>
@@ -1570,6 +1854,61 @@ export default function App() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* CONFIRMATION MODAL */}
+      {showConfirmModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999
+        }}>
+          <div className="glass-panel glowing-blue animate-slide-up" style={{
+            maxWidth: '500px',
+            width: '90%',
+            padding: '2rem',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            border: '1px solid rgba(59, 130, 246, 0.4)'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <i className="ti ti-mail-forward" style={{ color: 'var(--accent-blue)', fontSize: '1.5rem' }}></i>
+              Confirm Outreach Send
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              Are you sure you want to send this email to <strong>{contacts.find(c => c.id === pendingSendContactId)?.hr_name}</strong> at <strong>{contacts.find(c => c.id === pendingSendContactId)?.company}</strong>?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPendingSendContactId(null);
+                }}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  handleSendEmail(pendingSendContactId, true);
+                }}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+              >
+                Confirm & Send Email
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

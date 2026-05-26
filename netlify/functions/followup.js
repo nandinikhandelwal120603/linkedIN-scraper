@@ -14,21 +14,37 @@ export async function handler(event) {
   }
 
   try {
-    const { previousEmail, company, role, userProfile } = JSON.parse(event.body);
+    const { hrName, company, role, profile, previousSubject, previousBody } = JSON.parse(event.body);
 
     const prompt = `
-Write a short follow-up email.
+You are an expert cold outreach strategist writing follow-up emails that get replies from recruiters.
 
-Previous: ${previousEmail}
+CANDIDATE PROFILE:
+${JSON.stringify(profile)}
+
+TARGET:
+Recruiter: ${hrName}
 Company: ${company}
 Role: ${role}
-Profile: ${userProfile}
 
-Return JSON:
+PREVIOUS EMAIL SENT:
+Subject: ${previousSubject}
+Body:
+${previousBody}
+
+STRICT RULES:
+1. Keep it extremely short (under 50 words).
+2. Do not write a long paragraph. 1 or 2 lines max.
+3. Bring value or politely bump the previous conversation (e.g. "Just bumping this to see if you have 10 mins next week?").
+4. Tone: ${profile?.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+
+OUTPUT FORMAT (STRICT JSON):
 {
-  "subject":"",
-  "body":""
+  "subject": "string",
+  "body": "string"
 }
+
+Now generate the follow-up email.
 `;
 
     const raw = await callGemini(prompt);
@@ -48,3 +64,4 @@ Return JSON:
     };
   }
 }
+

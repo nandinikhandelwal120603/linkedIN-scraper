@@ -14,7 +14,7 @@ export async function handler(event) {
 
   try {
     const { data, error } = await supabase
-      .from("outreach_logs")
+      .from("emails")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -23,7 +23,7 @@ export async function handler(event) {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(data)
+      body: JSON.stringify({ success: true, data })
     };
 
   } catch (err) {
@@ -34,3 +34,4 @@ export async function handler(event) {
     };
   }
 }
+

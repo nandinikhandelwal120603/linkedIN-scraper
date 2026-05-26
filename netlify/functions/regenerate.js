@@ -14,21 +14,39 @@ export async function handler(event) {
   }
 
   try {
-    const { hrName, company, role, userProfile } = JSON.parse(event.body);
+    const { hrName, company, role, profile } = JSON.parse(event.body);
 
     const prompt = `
-Rewrite a personalized cold email.
+You are an expert cold outreach strategist writing emails that get replies from busy recruiters and founders.
+Your job is NOT to sound polite, but relevant, sharp, and builder-minded.
 
-HR: ${hrName}
+CANDIDATE PROFILE:
+${JSON.stringify(profile)}
+
+TARGET:
+Recruiter: ${hrName}
 Company: ${company}
 Role: ${role}
-Profile: ${userProfile}
 
-Return JSON:
+STRICT RULES:
+1. Keep the email body under 120 words.
+2. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
+3. No begging tone, no long paragraphs, no resume-style listing.
+4. Tone: ${profile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+
+EMAIL STRUCTURE (MANDATORY):
+1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
+2. PROOF (1-2 lines): mention ONE strong project or result from candidate's projects that matches company stack/needs.
+3. VALUE (1 line): connect candidate's work to company's needs.
+4. CLOSE (1 line): soft but confident ask (e.g. "Worth a quick chat?").
+
+OUTPUT FORMAT (STRICT JSON):
 {
-  "subject":"",
-  "body":""
+  "subject": "string",
+  "body": "string"
 }
+
+Now regenerate the best possible email.
 `;
 
     const raw = await callGemini(prompt);
@@ -48,3 +66,4 @@ Return JSON:
     };
   }
 }
+
