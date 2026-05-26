@@ -1814,10 +1814,6 @@ export default function App() {
                         <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 600 }}>
                           ⚠️ Pitch score too low ({c.score}/100) to send. Click "Regenerate Pitch" to fix.
                         </span>
-                      ) : (c.lead_score || 75) < 60 ? (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 600 }}>
-                          ⚠️ Lead probability score too low ({c.lead_score}/100) to send.
-                        </span>
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           {(c.score || 80) < 80 && (
@@ -1825,11 +1821,15 @@ export default function App() {
                               ⚠️ Pitch score is {c.score}/100.
                             </span>
                           )}
-                          {(c.lead_score || 75) >= 60 && (c.lead_score || 75) <= 75 && (
+                          {(c.lead_score || 75) < 60 ? (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--accent-rose)', fontStyle: 'italic', maxWidth: '180px', textAlign: 'right', fontWeight: 600 }}>
+                              ⚠️ Lead score is low ({c.lead_score}/100).
+                            </span>
+                          ) : (c.lead_score || 75) <= 75 ? (
                             <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', fontStyle: 'italic', maxWidth: '180px', textAlign: 'right' }}>
                               ⚠️ Lead score is {c.lead_score}/100. Manual review recommended.
                             </span>
-                          )}
+                          ) : null}
                           <button 
                             className="btn btn-primary"
                             style={{

@@ -67,11 +67,21 @@ Context: ${lead.reason_for_selection}
 
 ---
 
-STRICT RULES:
-1. Keep the email body under 120 words.
-2. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
-3. No begging tone, no long paragraphs, no resume-style listing.
+STRICT RULES & GOLDEN PRINCIPLES:
+1. High-Signal Keywords Only: Don't say "I am an expert developer who writes clean code." Say "I build with Python and LangGraph." Let the specific tools you use do the talking.
+2. Name the Project: Always name-drop a specific project from the candidate's profile (like AutoStream or GymFlow). It anchors your claims in reality and gives them something specific to ask about.
+3. The "What's in it for them" Pivot: The transition from what you built to how it helps them is where most cold emails fail. Always make sure you guess a real problem they are trying to solve and offer your skills as the solution.
 4. Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+5. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
+6. No begging tone, no long paragraphs, no resume-style listing.
+
+WORD COUNT & ZONE BREAKDOWN (STRICTLY TARGET 75 TO 125 WORDS TOTAL):
+- The sweet spot for a cold email to a startup founder or engineering lead is between 75 and 125 words. Too long (>150 words) looks like a wall of text. Too short (<50 words) looks lazy/templated.
+- Adhere to this approximate breakdown by Zone:
+  * [The Context]: 10 – 15 words. Short, genuine nod to their product (no corporate fluff) to validate that you actually know who they are.
+  * [The Flex]: 30 – 45 words. State exactly what you do, naming 1-2 high-signal tools (e.g., LangGraph, Supabase, Streamlit) and a concrete project you actually built.
+  * [The Connection]: 20 – 30 words. Show you understand their business by calling out a specific technical challenge/pain point they likely face (e.g., data pipeline scaling, UX constraints, automation bottlenecks).
+  * [The Low-Friction Call to Action]: 10 – 15 words. Low-friction request for a quick chat + clear next steps (Portfolio/GitHub link).
 
 EMAIL STRUCTURE (MANDATORY):
 Subject: [Hook / Direct value proposition relevant to them]
@@ -243,11 +253,22 @@ Fix ALL issues while:
 
 ---
 
-STRICT RULES:
-- Rewrite completely (not minor edits)
-- Improve hook specificity
-- Strengthen proof (project + metric)
-- Remove generic phrases
+STRICT RULES & GOLDEN PRINCIPLES:
+1. High-Signal Keywords Only: Don't say "I am an expert developer who writes clean code." Say "I build with Python and LangGraph." Let the specific tools you use do the talking.
+2. Name the Project: Always name-drop a specific project from the candidate's profile (like AutoStream or GymFlow). It anchors your claims in reality and gives them something specific to ask about.
+3. The "What's in it for them" Pivot: The transition from what you built to how it helps them is where most cold emails fail. Always make sure you guess a real problem they are trying to solve and offer your skills as the solution.
+4. Rewrite completely (not minor edits)
+5. Improve hook specificity
+6. Strengthen proof (project + metric)
+7. Remove generic phrases
+
+WORD COUNT & ZONE BREAKDOWN (STRICTLY TARGET 75 TO 125 WORDS TOTAL):
+- The sweet spot for a cold email to a startup founder or engineering lead is between 75 and 125 words. Too long (>150 words) looks like a wall of text. Too short (<50 words) looks lazy/templated.
+- Adhere to this approximate breakdown by Zone:
+  * [The Context]: 10 – 15 words. Short, genuine nod to their product (no corporate fluff) to validate that you actually know who they are.
+  * [The Flex]: 30 – 45 words. State exactly what you do, naming 1-2 high-signal tools (e.g., LangGraph, Supabase, Streamlit) and a concrete project you actually built.
+  * [The Connection]: 20 – 30 words. Show you understand their business by calling out a specific technical challenge/pain point they likely face (e.g., data pipeline scaling, UX constraints, automation bottlenecks).
+  * [The Low-Friction Call to Action]: 10 – 15 words. Low-friction request for a quick chat + clear next steps (Portfolio/GitHub link).
 
 EMAIL STRUCTURE (MANDATORY):
 Subject: [Hook / Direct value proposition relevant to them]
@@ -307,20 +328,19 @@ Email Score: ${emailScore}
 EVALUATE:
 
 1. COMPANY TYPE (0–25)
-- Startup / small team → high
-- Mid-size → medium
-- Big tech / corporate → low
+- Startup / small team → 23 - 25 points
+- Mid-size / growing companies → 20 - 22 points
+- Big tech / corporate → 15 - 19 points
 
 2. ROLE RELEVANCE & DOMAIN MATCH (0–25)
-- Does candidate profile strongly match this role domain (${mode})?
-- Direct match → high
-- Partial match → medium
-- Weak → low
+- Direct match → 23 - 25 points
+- Partial match → 18 - 22 points
+- Weak match → 10 - 17 points
 
 3. DECISION MAKER PROXIMITY (0–25)
-- Founder / Hiring Manager → high
-- Engineer / Team Lead → medium
-- Generic HR → low
+- Founder / Hiring Manager / Tech Recruiter / Talent Acquisition → 23 - 25 points
+- Engineer / Team Lead / General Recruiter → 18 - 22 points
+- Generic HR / other roles → 12 - 17 points
 
 4. EMAIL QUALITY SCORE (0–25)
 - Use given email_score (normalize the score from 0-100 down to 0-25)
@@ -328,10 +348,8 @@ EVALUATE:
 ---
 
 BEHAVIOR RULES:
-- Be practical, not optimistic
-- Prefer startups over big companies
-- Prefer builders over HR
-- Be selective
+- Be optimistic and encouraging. If a lead has a valid email, matches the role, and is actively hiring, give a higher lead score (aim for 75-95 overall).
+- Do not artificially penalize valid recruiter/HR contacts or mid/large companies just because they are not tiny startups. Tech recruiters and mid/large companies are highly valuable targets.
 
 ---
 
