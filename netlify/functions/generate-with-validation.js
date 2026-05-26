@@ -3,7 +3,7 @@ import { safeParse } from "./utils/parser.js";
 import { getProfile } from "./utils/supabase.js";
 
 // Helper to classify job type
-async function classifyJob(role, companyName, reason) {
+export async function classifyJob(role, companyName, reason) {
   const prompt = `
 Classify this job opportunity into one of these exact categories:
 [genai, aiml, cv, robotics, automation]
@@ -27,7 +27,7 @@ Return ONLY one word from the list.
 }
 
 // Helper to generate initial email tailored to a profile mode
-async function generateInitialEmail(lead, role, activeProfile, selectedProfile, mode) {
+export async function generateInitialEmail(lead, role, activeProfile, selectedProfile, mode) {
   const prompt = `
 You are writing a cold outreach email.
 
@@ -99,7 +99,7 @@ OUTPUT FORMAT (STRICT JSON):
 }
 
 // Helper to run email validation
-async function validateEmail(subject, body, company, role, mode) {
+export async function validateEmail(subject, body, company, role, mode) {
   const prompt = `
 You are a recruiter reviewing 100+ cold emails per day.
 
@@ -195,7 +195,7 @@ RETURN JSON:
 }
 
 // Helper to regenerate email based on validation feedback
-async function regenerateEmail(previousSubject, previousBody, issues, suggestions, activeProfile, selectedProfile, mode) {
+export async function regenerateEmail(previousSubject, previousBody, issues, suggestions, activeProfile, selectedProfile, mode) {
   const prevEmailText = `Subject: ${previousSubject || ''}\n\n${previousBody || ''}`;
   const issuesText = (issues || []).join('\n');
   const suggestionsText = (suggestions || []).join('\n');
@@ -261,7 +261,7 @@ OUTPUT JSON:
 }
 
 // Helper to run lead scoring evaluation
-async function scoreLead(company, role, hrTitle, emailScore, mode) {
+export async function scoreLead(company, role, hrTitle, emailScore, mode) {
   const prompt = `
 You are evaluating whether a job outreach lead is worth emailing.
 
@@ -333,7 +333,7 @@ RETURN JSON:
 }
 
 // Process a single HR contact's email in a self-improving loop
-async function processContact(hr, companyName, role, activeProfile) {
+export async function processContact(hr, companyName, role, activeProfile) {
   const MAX_RETRIES = 2;
   let attempt = 0;
 
@@ -652,9 +652,8 @@ Now generate the output.
       };
     }));
 
-    // 5. Filter: keep only leads with lead_score >= 70, Sort descending by lead_score, Slice to top 8 (target 5-8 unique companies)
+    // 5. Sort descending by lead_score, Slice to top 8 (target 5-8 unique companies)
     const finalLeads = scoredLeads
-      .filter(l => l.lead_score >= 70)
       .sort((a, b) => b.lead_score - a.lead_score)
       .slice(0, 8);
 
