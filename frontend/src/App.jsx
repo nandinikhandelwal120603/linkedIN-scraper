@@ -582,6 +582,22 @@ export default function App() {
     }));
   };
 
+  const handleEmailChange = (contactId, newEmail) => {
+    setContacts(prev => prev.map(c => {
+      if (c.id === contactId) {
+        const encodedTo = encodeURIComponent(newEmail);
+        const encodedSubject = encodeURIComponent(c.subject);
+        const encodedBody = encodeURIComponent(c.body);
+        return {
+          ...c,
+          hr_email: newEmail,
+          gmail_compose_url: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedTo}&su=${encodedSubject}&body=${encodedBody}`
+        };
+      }
+      return c;
+    }));
+  };
+
   // Trigger Send: Dispatches via Gmail API if enabled, otherwise opens compose link
   const handleSendEmail = async (contactId, isConfirmed = false) => {
     const contact = contacts.find(c => c.id === contactId);
@@ -1488,14 +1504,34 @@ export default function App() {
                       <div>
                         <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Corporate Email</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>{c.hr_email || 'No email available'}</span>
+                          <input
+                            type="text"
+                            value={c.hr_email || ''}
+                            onChange={(e) => handleEmailChange(c.id, e.target.value)}
+                            placeholder="Enter email..."
+                            style={{
+                              background: 'rgba(255,255,255,0.06)',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              borderRadius: '6px',
+                              color: 'var(--text-primary)',
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: '0.85rem',
+                              padding: '4px 8px',
+                              width: '100%',
+                              maxWidth: '220px',
+                              outline: 'none',
+                              transition: 'border-color 0.2s'
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--accent-blue)'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.12)'}
+                          />
                           {c.hr_email && (
                             <button 
                               onClick={() => {
                                 navigator.clipboard.writeText(c.hr_email);
                                 alert('Email copied!');
                               }}
-                              style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', fontSize: '0.75rem' }}
+                              style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', fontSize: '0.75rem', padding: '4px' }}
                             >
                               [Copy]
                             </button>
