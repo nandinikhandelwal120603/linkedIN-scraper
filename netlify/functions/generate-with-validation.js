@@ -481,6 +481,7 @@ export async function handler(event) {
 
     const serperApiKey = serperKeyOverride || process.env.SERPER_API_KEY;
     let topJobs = [];
+    let recruiterSignalsText = "No real-time recruiter search context available.";
 
     if (serperApiKey) {
       console.log(`🔍 Running dual-pipeline Serper search for role: ${role}`);
@@ -563,6 +564,64 @@ export async function handler(event) {
         scoredJobs.sort((a, b) => b.score - a.score);
         topJobs = scoredJobs.slice(0, 8);
         console.log(`✅ Serper search complete. Found ${scoredJobs.length} matching jobs, selected top ${topJobs.length}.`);
+
+        // Extract company names from topJobs to run real-time recruiter searches
+        let companiesList = [];
+        if (topJobs.length > 0) {
+          const extractionPrompt = `
+Analyze these job search results and extract a clean list of company names offering these jobs.
+Format the output as a strict JSON array of strings, e.g. ["Google", "BuiltIn", "Glassdoor"].
+Do not include any explanation or extra text, only the JSON array.
+
+Job listings:
+${topJobs.map((j, idx) => `${idx + 1}. Title: ${j.title} | Snippet: ${j.snippet}`).join("\n")}
+`;
+          try {
+            const rawCompanies = await callGemini(extractionPrompt);
+            companiesList = safeParse(rawCompanies);
+            if (Array.isArray(companiesList)) {
+              companiesList = Array.from(new Set(companiesList.map(c => c.trim()).filter(Boolean)));
+            } else {
+              companiesList = [];
+            }
+          } catch (e) {
+            console.error("Failed to extract company names for recruiter search:", e.message);
+          }
+        }
+
+        if (companiesList.length > 0) {
+          console.log(`🔍 Running Serper searches for actual recruiters at companies: ${companiesList.join(", ")}`);
+          const recruiterSearchPromises = companiesList.map(async (companyName) => {
+            const q = `"${companyName}" (recruiter OR "talent acquisition" OR "hiring manager" OR "HR") LinkedIn`;
+            try {
+              const response = await fetch("https://google.serper.dev/search", {
+                method: "POST",
+                headers: {
+                  "X-API-KEY": serperApiKey,
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ q, num: 3 })
+              });
+              if (response.ok) {
+                const data = await response.json();
+                const items = (data.organic || [])
+                  .map(item => `- Title/Name: ${item.title}\n  Profile: ${item.link}\n  Snippet: ${item.snippet}`)
+                  .join("\n");
+                return { company: companyName, contacts: items || "No organic search results found." };
+              }
+            } catch (err) {
+              console.error(`Failed to fetch recruiter search for ${companyName}:`, err.message);
+            }
+            return { company: companyName, contacts: "No recruiter search results found." };
+          });
+
+          const recruiterResults = await Promise.all(recruiterSearchPromises);
+          recruiterSignalsText = recruiterResults.map(r => `
+Company: ${r.company}
+Recruiter Search Results:
+${r.contacts}
+`).join("\n---\n");
+        }
       } catch (err) {
         console.error("❌ Serper pipeline failed, falling back to generative mode:", err.message);
       }
@@ -584,14 +643,21 @@ Type: ${j.type} (Score: ${j.score})
     // 1. Generate companies and contacts
     const initialPrompt = `
 You are an expert cold outreach strategist and recruiter research agent.
-Your task is to identify top hiring companies (top 8-10 ONLY) and generate realistic HR/recruiter contact entries.
+Your task is to identify top hiring companies (top 8-10 ONLY) and find/generate recruiter contact entries.
 
 ${topJobs.length > 0 ? `
 We have gathered the following REAL job signals from active listings:
 ${jobSignalsText}
 
+We also searched the live web using Serper Dev to find real recruiter/Talent Acquisition LinkedIn profiles for these companies:
+${recruiterSignalsText}
+
 STRICT RULE:
-Based on the real job signals above, extract the target company name, industry, and select or guess a realistic HR/recruiter contact (e.g. Talent Acquisition, HR Manager, Founder). Map the generated contacts directly to the companies from the signals and include the "job_link" matching that company.
+Based on the real job signals and recruiter search results, extract the target company name, industry, and select the real recruiter contact and their LinkedIn URL from the search results. 
+If the recruiter's email is not explicitly found in the search results, generate a realistic corporate email address based on their real name and the company's domain.
+Follow these email generation guidelines:
+- Prefer the format 'first.last@company.com' (e.g. sarah.jenkins@glassdoor.com) as it has the lowest bounce rate, or use 'first_initial+lastname@company.com' (e.g. sjenkins@glassdoor.com).
+- Map the generated contacts directly to the companies from the signals and include the "job_link" matching that company.
 ` : `
 TARGET ROLE:
 ${role}
