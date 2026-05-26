@@ -2,8 +2,104 @@ import { callGemini } from "./utils/gemini.js";
 import { safeParse } from "./utils/parser.js";
 import { getProfile } from "./utils/supabase.js";
 
+// Helper to classify job type
+async function classifyJob(role, companyName, reason) {
+  const prompt = `
+Classify this job opportunity into one of these exact categories:
+[genai, aiml, cv, robotics, automation]
+
+Role: ${role}
+Company: ${companyName}
+Context: ${reason}
+
+Return ONLY one word from the list.
+`;
+
+  try {
+    const raw = await callGemini(prompt);
+    const mode = raw.trim().toLowerCase();
+    const validModes = ["genai", "aiml", "cv", "robotics", "automation"];
+    return validModes.includes(mode) ? mode : "genai";
+  } catch (err) {
+    console.error("Job classification error:", err);
+    return "genai";
+  }
+}
+
+// Helper to generate initial email tailored to a profile mode
+async function generateInitialEmail(lead, role, activeProfile, selectedProfile, mode) {
+  const prompt = `
+You are writing a cold outreach email.
+
+---
+
+CANDIDATE PROFILE:
+
+Name: ${activeProfile.name || ''}
+Degree: ${activeProfile.degree || ''}
+College: ${activeProfile.college || ''}
+CGPA: ${activeProfile.cgpa || ''}
+LinkedIn: ${activeProfile.linkedin || ''}
+GitHub: ${activeProfile.github || ''}
+
+Mode: ${mode}
+
+Summary:
+${selectedProfile.summary || ''}
+
+Skills:
+${(selectedProfile.skills || []).join(", ")}
+
+Key Projects:
+${(selectedProfile.key_projects || []).map(p => `
+- ${p.title}: ${p.description} (${p.impact || ''})
+`).join("\n")}
+
+Signals:
+${(selectedProfile.signals || []).join(", ")}
+
+---
+
+TARGET:
+Company: ${lead.company_name}
+Role: ${role}
+Context: ${lead.reason_for_selection}
+
+---
+
+STRICT RULES:
+1. Keep the email body under 120 words.
+2. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
+3. No begging tone, no long paragraphs, no resume-style listing.
+4. Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+
+EMAIL STRUCTURE (MANDATORY):
+1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
+2. PROOF (1-2 lines): mention ONE relevant project from the candidate's projects above.
+3. VALUE (1 line): connect candidate's work to company's needs.
+4. CLOSE (1 line): soft but confident ask (e.g. "Worth a quick chat?").
+
+OUTPUT FORMAT (STRICT JSON):
+{
+  "subject": "string",
+  "body": "string"
+}
+`;
+
+  try {
+    const raw = await callGemini(prompt);
+    return safeParse(raw);
+  } catch (err) {
+    console.error("Initial email generation error:", err);
+    return {
+      subject: `Outreach regarding ${role} role at ${lead.company_name}`,
+      body: `Hi, I am interested in the ${role} position.`
+    };
+  }
+}
+
 // Helper to run email validation
-async function validateEmail(subject, body, company, role) {
+async function validateEmail(subject, body, company, role, mode) {
   const prompt = `
 You are a recruiter reviewing 100+ cold emails per day.
 
@@ -26,6 +122,7 @@ Body: ${body || ''}
 TARGET:
 Company: ${company || ''}
 Role: ${role || ''}
+Role Domain (Mode): ${mode}
 
 ---
 
@@ -36,11 +133,11 @@ EVALUATE STRICTLY:
 - Or could it be sent to anyone?
 
 2. PROOF STRENGTH (0–25)
-- Is there ONE clear project/result with a metric?
-- Or vague claims?
+- Is there ONE clear relevant project/result?
+- IMPORTANT: Does the project proof match the job domain (${mode})? Or is there a mismatch (e.g. emailing a GenAI role but proving with a CV project)? Reject mismatch with low score.
 
 3. RELEVANCE (0–25)
-- Does it align with the role/company?
+- Does it align with the role/company and domain (${mode})?
 - Or generic AI talk?
 
 4. TONE (0–25)
@@ -52,7 +149,8 @@ AUTO-FAIL CONDITIONS:
 
 If ANY of these are true:
 - Generic opening line
-- No specific project mentioned
+- No specific relevant project mentioned
+- Project proof does not match the role domain (${mode})
 - Email > 120 words
 - Sounds like template spam
 
@@ -97,7 +195,7 @@ RETURN JSON:
 }
 
 // Helper to regenerate email based on validation feedback
-async function regenerateEmail(previousSubject, previousBody, issues, suggestions, activeProfile) {
+async function regenerateEmail(previousSubject, previousBody, issues, suggestions, activeProfile, selectedProfile, mode) {
   const prevEmailText = `Subject: ${previousSubject || ''}\n\n${previousBody || ''}`;
   const issuesText = (issues || []).join('\n');
   const suggestionsText = (suggestions || []).join('\n');
@@ -128,7 +226,10 @@ Fix ALL issues while:
 - keeping it natural
 - keeping it short (max 120 words)
 - keeping tone confident
-- utilizing candidate profile context: ${JSON.stringify(activeProfile)}
+- utilizing candidate profile context for Mode (${mode}):
+  Summary: ${selectedProfile.summary || ''}
+  Skills: ${(selectedProfile.skills || []).join(", ")}
+  Projects: ${(selectedProfile.key_projects || []).map(p => `- ${p.title}: ${p.description}`).join("\n")}
 
 ---
 
@@ -160,7 +261,7 @@ OUTPUT JSON:
 }
 
 // Helper to run lead scoring evaluation
-async function scoreLead(company, role, hrTitle, emailScore) {
+async function scoreLead(company, role, hrTitle, emailScore, mode) {
   const prompt = `
 You are evaluating whether a job outreach lead is worth emailing.
 
@@ -173,6 +274,7 @@ LEAD INFO:
 
 Company: ${company}
 Role: ${role}
+Role Domain (Mode): ${mode}
 HR Title: ${hrTitle}
 Email Score: ${emailScore}
 
@@ -185,7 +287,8 @@ EVALUATE:
 - Mid-size → medium
 - Big tech / corporate → low
 
-2. ROLE RELEVANCE (0–25)
+2. ROLE RELEVANCE & DOMAIN MATCH (0–25)
+- Does candidate profile strongly match this role domain (${mode})?
 - Direct match → high
 - Partial match → medium
 - Weak → low
@@ -229,6 +332,93 @@ RETURN JSON:
   }
 }
 
+// Process a single HR contact's email in a self-improving loop
+async function processContact(hr, companyName, role, activeProfile) {
+  const MAX_RETRIES = 2;
+  let attempt = 0;
+
+  // 1. Classify job type into one of the modes
+  const mode = await classifyJob(role, companyName, hr.reason_for_selection || '');
+  const profileModes = activeProfile.profileModes || {};
+  const selectedProfile = profileModes[mode] || profileModes["genai"] || {};
+
+  // 2. Generate initial email draft tailored to the selected mode
+  const initialEmail = await generateInitialEmail(hr, role, activeProfile, selectedProfile, mode);
+
+  let currentSubject = initialEmail.subject || 'Job Opportunity';
+  let currentBody = initialEmail.body || '';
+
+  let bestSubject = currentSubject;
+  let bestBody = currentBody;
+  let bestScore = 0;
+  let bestValidation = null;
+
+  while (attempt <= MAX_RETRIES) {
+    const validation = await validateEmail(currentSubject, currentBody, companyName, role, mode);
+    const score = Number(validation.score) || 0;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestSubject = currentSubject;
+      bestBody = currentBody;
+      bestValidation = validation;
+    }
+
+    if (score >= 80) {
+      return {
+        ...hr,
+        email_content: {
+          subject: currentSubject,
+          body: currentBody
+        },
+        mode,
+        validation: {
+          score,
+          verdict: validation.verdict || "approved",
+          issues: validation.issues || [],
+          suggestions: validation.fix_suggestions || [],
+          attempts: attempt + 1,
+          status: "approved"
+        }
+      };
+    }
+
+    // Otherwise, regenerate using feedback
+    const regenerated = await regenerateEmail(
+      currentSubject,
+      currentBody,
+      validation.issues || [],
+      validation.fix_suggestions || [],
+      activeProfile,
+      selectedProfile,
+      mode
+    );
+
+    currentSubject = regenerated.subject || currentSubject;
+    currentBody = regenerated.body || currentBody;
+
+    attempt++;
+  }
+
+  // Fallback: return best version
+  return {
+    ...hr,
+    email_content: {
+      subject: bestSubject,
+      body: bestBody
+    },
+    mode,
+    validation: {
+      score: bestScore,
+      verdict: bestValidation?.verdict || "fallback_best",
+      issues: bestValidation?.issues || [],
+      suggestions: bestValidation?.fix_suggestions || [],
+      attempts: MAX_RETRIES + 1,
+      status: "fallback_best"
+    }
+  };
+}
+
 export async function handler(event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -250,7 +440,7 @@ export async function handler(event) {
     // 1. Generate companies and contacts
     const initialPrompt = `
 You are an expert cold outreach strategist and recruiter research agent.
-Your task is to identify top hiring companies (top 8-10 ONLY) matching the target role, generate realistic HR/recruiter contact entries, and craft high-converting cold outreach emails.
+Your task is to identify top hiring companies (top 8-10 ONLY) matching the target role and generate realistic HR/recruiter contact entries.
 
 TARGET ROLE:
 ${role}
@@ -261,16 +451,6 @@ ${JSON.stringify(activeProfile)}
 STRICT RULES:
 1. Keep the output companies list limited to top 8-10 ONLY.
 2. Return maximum ONE contact per company. Do NOT include multiple employees from the same company. Prefer diversity of companies over multiple contacts.
-3. Every email body must be under 120 words.
-4. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
-5. No begging tone, no long paragraphs, no resume-style listing.
-6. Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
-
-EMAIL STRUCTURE (MANDATORY):
-1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
-2. PROOF (1-2 lines): mention ONE strong project or result from candidate's projects that matches company stack/needs. Make it sound real, not buzzwords.
-3. VALUE (1 line): connect candidate's work to company's needs.
-4. CLOSE (1 line): soft but confident ask (e.g. "Worth a quick chat?").
 
 OUTPUT FORMAT (STRICT JSON):
 {
@@ -284,11 +464,7 @@ OUTPUT FORMAT (STRICT JSON):
           "name": "string",
           "email": "string",
           "email_confidence": "high | medium | low",
-          "linkedin": "string",
-          "email_content": {
-            "subject": "string",
-            "body": "string"
-          }
+          "linkedin": "string"
         }
       ]
     }
@@ -318,8 +494,7 @@ Now generate the output.
             hr_email: hr.email,
             hr_email_confidence: hr.email_confidence || 'medium',
             hr_linkedin: hr.linkedin || '',
-            hr_title: hr.title || 'Recruiter',
-            email_content: hr.email_content || { subject: '', body: '' }
+            hr_title: hr.title || 'Recruiter'
           });
         });
       }
@@ -327,75 +502,7 @@ Now generate the output.
 
     // 2. Validate and auto-improve each contact's email in parallel
     const validatedLeads = await Promise.all(initialLeads.map(async (lead) => {
-      const MAX_RETRIES = 2;
-      let attempt = 0;
-
-      let currentSubject = lead.email_content.subject || 'Job Opportunity';
-      let currentBody = lead.email_content.body || '';
-
-      let bestSubject = currentSubject;
-      let bestBody = currentBody;
-      let bestScore = 0;
-      let bestValidation = null;
-
-      while (attempt <= MAX_RETRIES) {
-        const validation = await validateEmail(currentSubject, currentBody, lead.company_name, role);
-        const score = Number(validation.score) || 0;
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestSubject = currentSubject;
-          bestBody = currentBody;
-          bestValidation = validation;
-        }
-
-        if (score >= 80) {
-          return {
-            ...lead,
-            email_content: {
-              subject: currentSubject,
-              body: currentBody
-            },
-            validation: {
-              score,
-              verdict: validation.verdict || "approved",
-              issues: validation.issues || [],
-              suggestions: validation.fix_suggestions || [],
-              attempts: attempt + 1,
-              status: "approved"
-            }
-          };
-        }
-
-        const regenerated = await regenerateEmail(
-          currentSubject,
-          currentBody,
-          validation.issues || [],
-          validation.fix_suggestions || [],
-          activeProfile
-        );
-
-        currentSubject = regenerated.subject || currentSubject;
-        currentBody = regenerated.body || currentBody;
-
-        attempt++;
-      }
-
-      return {
-        ...lead,
-        email_content: {
-          subject: bestSubject,
-          body: bestBody
-        },
-        validation: {
-          score: bestScore,
-          verdict: bestValidation?.verdict || "fallback_best",
-          issues: bestValidation?.issues || [],
-          suggestions: bestValidation?.fix_suggestions || [],
-          attempts: MAX_RETRIES + 1,
-          status: "fallback_best"
-        }
-      };
+      return await processContact(lead, lead.company_name, role, activeProfile);
     }));
 
     // 3. Deduplication: Pick the BEST contact per company (highest validation score)
@@ -421,7 +528,8 @@ Now generate the output.
         lead.company_name,
         role,
         lead.hr_title,
-        lead.validation?.score || 80
+        lead.validation?.score || 80,
+        lead.mode || 'genai'
       );
 
       return {
@@ -453,7 +561,8 @@ Now generate the output.
           validation: lead.validation,
           lead_score: lead.lead_score,
           lead_priority: lead.lead_priority,
-          lead_reason: lead.lead_reason
+          lead_reason: lead.lead_reason,
+          mode: lead.mode
         }
       ]
     }));

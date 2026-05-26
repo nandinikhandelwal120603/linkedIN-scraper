@@ -311,12 +311,14 @@ export default function App() {
   };
 
   // Regenerate a single contact email
-  const handleRegenerateEmail = async (contactId) => {
+  const handleRegenerateEmail = async (contactId, overrideMode = null) => {
     const contact = contacts.find(c => c.id === contactId);
     if (!contact) return;
 
+    const activeMode = overrideMode || contact.mode || 'genai';
+
     // Set temporary state for loading
-    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, isRegenerating: true } : c));
+    setContacts(prev => prev.map(c => c.id === contactId ? { ...c, isRegenerating: true, mode: activeMode } : c));
 
     try {
       // First, get the regenerated email from the backend
@@ -332,6 +334,7 @@ export default function App() {
           previousBody: contact.body,
           issues: contact.issues || [],
           suggestions: contact.suggestions || [],
+          mode: activeMode,
           geminiKeyOverride: geminiKey
         })
       });
@@ -350,7 +353,8 @@ export default function App() {
           subject: newSubject,
           body: newBody,
           company: contact.company,
-          role: searchRole || profile.targetRole || 'Software Engineer'
+          role: searchRole || profile.targetRole || 'Software Engineer',
+          mode: activeMode
         })
       });
 
@@ -366,7 +370,8 @@ export default function App() {
           role: searchRole || profile.targetRole || 'Software Engineer',
           hr_title: contact.hr_title || 'Recruiter',
           email: contact.hr_email,
-          email_score: valData.score || 70
+          email_score: valData.score || 70,
+          mode: activeMode
         })
       });
 
@@ -393,6 +398,7 @@ export default function App() {
             lead_score: scoreData.lead_score || 75,
             lead_priority: scoreData.priority || 'medium',
             lead_reason: scoreData.reason || 'Standard lead match',
+            mode: activeMode,
             isRegenerating: false
           };
         }
@@ -1383,6 +1389,32 @@ export default function App() {
                             >
                               🔥 Lead Score: {c.lead_score} ({c.lead_priority.toUpperCase()})
                             </span>
+                          )}
+                          {c.mode && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Mode:</span>
+                              <select 
+                                value={c.mode}
+                                onChange={(e) => handleRegenerateEmail(c.id, e.target.value)}
+                                style={{
+                                  padding: '2px 8px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '600',
+                                  borderRadius: '4px',
+                                  borderColor: 'var(--border-strong)',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  color: 'var(--text-primary)',
+                                  cursor: 'pointer',
+                                  width: 'auto'
+                                }}
+                              >
+                                <option value="genai">GenAI ⚡</option>
+                                <option value="aiml">AI/ML 🧠</option>
+                                <option value="cv">Vision 👁️</option>
+                                <option value="robotics">Robotics 🤖</option>
+                                <option value="automation">Automation ⚙️</option>
+                              </select>
+                            </div>
                           )}
                           {c.careers_url && (
                             <a href={c.careers_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>

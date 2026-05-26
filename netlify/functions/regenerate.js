@@ -15,10 +15,13 @@ export async function handler(event) {
   }
 
   try {
-    const { hrName, company, role, profile, previousSubject, previousBody, issues, suggestions } = JSON.parse(event.body);
+    const { hrName, company, role, profile, previousSubject, previousBody, issues, suggestions, mode } = JSON.parse(event.body);
 
     const dbProfile = await getProfile();
     const activeProfile = dbProfile || profile || {};
+    const activeMode = mode || 'genai';
+    const profileModes = activeProfile.profileModes || {};
+    const selectedProfile = profileModes[activeMode] || profileModes['genai'] || {};
 
     let prompt = '';
 
@@ -53,7 +56,10 @@ Fix ALL issues while:
 - keeping it natural
 - keeping it short (max 120 words)
 - keeping tone confident
-- utilizing candidate profile context: ${JSON.stringify(activeProfile)}
+- utilizing candidate profile context for Mode (${activeMode}):
+  Summary: ${selectedProfile.summary || ''}
+  Skills: ${(selectedProfile.skills || []).join(", ")}
+  Projects: ${(selectedProfile.key_projects || []).map(p => `- ${p.title}: ${p.description}`).join("\n")}
 
 ---
 
@@ -77,7 +83,15 @@ You are an expert cold outreach strategist writing emails that get replies from 
 Your job is NOT to sound polite, but relevant, sharp, and builder-minded.
 
 CANDIDATE PROFILE:
-${JSON.stringify(activeProfile)}
+Name: ${activeProfile.name || ''}
+Degree: ${activeProfile.degree || ''}
+College: ${activeProfile.college || ''}
+CGPA: ${activeProfile.cgpa || ''}
+
+Mode: ${activeMode}
+Summary: ${selectedProfile.summary || ''}
+Skills: ${(selectedProfile.skills || []).join(", ")}
+Projects: ${(selectedProfile.key_projects || []).map(p => `- ${p.title}: ${p.description}`).join("\n")}
 
 TARGET:
 Recruiter: ${hrName}
@@ -92,7 +106,7 @@ STRICT RULES:
 
 EMAIL STRUCTURE (MANDATORY):
 1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
-2. PROOF (1-2 lines): mention ONE strong project or result from candidate's projects that matches company stack/needs.
+2. PROOF (1-2 lines): mention ONE relevant project from candidate's projects that matches company stack/needs.
 3. VALUE (1 line): connect candidate's work to company's needs.
 4. CLOSE (1 line): soft but confident ask (e.g. "Worth a quick chat?").
 

@@ -44,6 +44,7 @@ export async function handler(event) {
         github: payload.github || '',
         projects: payload.projects || '',
         tone: payload.tone || 'confident, builder, not desperate',
+        profile_modes: payload.profileModes || {},
         updated_at: new Date().toISOString()
       };
 

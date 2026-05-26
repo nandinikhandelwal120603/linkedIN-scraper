@@ -14,7 +14,8 @@ export async function handler(event) {
   }
 
   try {
-    const { subject, body, company, role } = JSON.parse(event.body || '{}');
+    const { subject, body, company, role, mode } = JSON.parse(event.body || '{}');
+    const activeMode = mode || 'genai';
 
     const prompt = `
 You are a recruiter reviewing 100+ cold emails per day.
@@ -38,6 +39,7 @@ Body: ${body || ''}
 TARGET:
 Company: ${company || ''}
 Role: ${role || ''}
+Role Domain (Mode): ${activeMode}
 
 ---
 
@@ -48,11 +50,11 @@ EVALUATE STRICTLY:
 - Or could it be sent to anyone?
 
 2. PROOF STRENGTH (0–25)
-- Is there ONE clear project/result with a metric?
-- Or vague claims?
+- Is there ONE clear relevant project/result?
+- IMPORTANT: Does the project proof match the job domain (${activeMode})? Or is there a mismatch (e.g. emailing a GenAI role but proving with a CV project)? Reject mismatch with low score.
 
 3. RELEVANCE (0–25)
-- Does it align with the role/company?
+- Does it align with the role/company and domain (${activeMode})?
 - Or generic AI talk?
 
 4. TONE (0–25)
@@ -64,7 +66,8 @@ AUTO-FAIL CONDITIONS:
 
 If ANY of these are true:
 - Generic opening line
-- No specific project mentioned
+- No specific relevant project mentioned
+- Project proof does not match the role domain (${activeMode})
 - Email > 120 words
 - Sounds like template spam
 
@@ -74,7 +77,6 @@ score = max 55
 ---
 
 BEHAVIOR RULES:
-
 - Be harsh, not polite
 - Do NOT praise weak emails
 - Call out exact problems
@@ -83,7 +85,6 @@ BEHAVIOR RULES:
 ---
 
 RETURN JSON:
-
 {
   "score": number,
   "verdict": "bad" | "okay" | "good",

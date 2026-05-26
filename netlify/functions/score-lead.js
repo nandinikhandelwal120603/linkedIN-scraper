@@ -14,7 +14,8 @@ export async function handler(event) {
   }
 
   try {
-    const { company, role, hr_title, email, email_score } = JSON.parse(event.body || '{}');
+    const { company, role, hr_title, email, email_score, mode } = JSON.parse(event.body || '{}');
+    const activeMode = mode || 'genai';
 
     const prompt = `
 You are evaluating whether a job outreach lead is worth emailing.
@@ -28,6 +29,7 @@ LEAD INFO:
 
 Company: ${company || ''}
 Role: ${role || ''}
+Role Domain (Mode): ${activeMode}
 HR Title: ${hr_title || 'Recruiter'}
 Email Score: ${email_score || 80}
 
@@ -40,7 +42,8 @@ EVALUATE:
 - Mid-size → medium
 - Big tech / corporate → low
 
-2. ROLE RELEVANCE (0–25)
+2. ROLE RELEVANCE & DOMAIN MATCH (0–25)
+- Does candidate profile strongly match this role domain (${activeMode})?
 - Direct match → high
 - Partial match → medium
 - Weak → low
