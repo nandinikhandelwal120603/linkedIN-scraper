@@ -21,7 +21,10 @@ export async function handler(event) {
 
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",
-      scope: ["https://www.googleapis.com/auth/gmail.send"],
+      scope: [
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.readonly"
+      ],
       prompt: "consent"
     });
 

@@ -15,13 +15,22 @@ Role: ${role}
 User Background: ${userProfile}
 
 EMAIL RULES & GOLDEN PRINCIPLES:
-1. High-Signal Keywords Only: Don't say "I am an expert developer who writes clean code." Say "I build with Python and LangGraph." Let the specific tools you use do the talking.
-2. Name the Project: Always name-drop a specific project from the candidate's profile (like AutoStream or GymFlow). It anchors your claims in reality and gives them something specific to ask about.
-3. The "What's in it for them" Pivot: The transition from what you built to how it helps them is where most cold emails fail. Always make sure you guess a real problem they are trying to solve and offer your skills as the solution.
-4. Rewrite completely (not minor edits)
-5. Improve hook specificity
-6. Strengthen proof (project + metric)
-7. Remove generic phrases
+1. Speak Developer-to-Developer: Write exactly how engineers talk to each other on Slack/Discord: concise, direct, focused on implementation over theory. Ask yourself: "Would I say this out loud to another engineer over a beer?" If it sounds too formal/stiff, rewrite it.
+2. Respect Their Scale (Don't Lecture Them): Never explain a company's own tech stack or business model back to them. Empathize with the difficulty of their scale instead.
+   - ❌ "Indeed relies on sub-millisecond query routing to handle massive job indexes."
+   - ✓ "Managing search intent across millions of live job posts is a massive data challenge."
+3. Talk About HOW You Build: High-signal engineers talk architecture and constraints. Use specific, production-focused keywords. Use terms like: deterministic workflows, high-throughput, evaluation harnesses, latency reduction, state management, edge cases. E.g. "Moving past basic prompt chains into deterministic LangGraph workflows."
+4. Strip Out Passive, Formal Fluff: Avoid corporate phrases. E.g.
+   - Replace "I recognize the challenge of..." with "Scaling [X] usually runs into..."
+   - Replace "I would love to learn about your roadmap..." with "I'd love to see how you're handling..."
+   - Replace "My experience could support your team..." with "Love to share how I solved this..."
+   - Replace "Are you open to a 10-minute technical sync?" with "Open to a quick 10-minute chat?"
+5. Use Grit Over Polish: Sound like a builder who just stepped away from their IDE. Use active, punchy verbs (slashed latency, cut bottlenecks, shipped) and casual punctuation (—, /) naturally.
+6. Name the Project: Always name-drop a specific project from the candidate's profile (like AutoStream or GymFlow). It anchors your claims in reality.
+7. Rewrite completely (not minor edits)
+8. Improve hook specificity
+9. Strengthen proof (project + metric)
+10. Remove generic phrases
 
 WORD COUNT & ZONE BREAKDOWN (STRICTLY TARGET 75 TO 125 WORDS TOTAL):
 - The sweet spot for a cold email to a startup founder or engineering lead is between 75 and 125 words. Too long (>150 words) looks like a wall of text. Too short (<50 words) looks lazy/templated.
@@ -42,10 +51,11 @@ Hey [Name],
 
 [The Connection]: Show you understand their business by naming a specific technical challenge they likely face (e.g., data pipeline scaling, UX constraints, automation bottlenecks).
 
-[The Low-Friction Call to Action]: Specific, short time commitment + clear next steps (Portfolio/GitHub link).
+[The Low-Friction Call to Action]: Specific, short time commitment + clear next steps. Link to portfolio and GitHub.
 
 Best,
 [Your Name]
+[nandinikhandewal.netlify.app](https://nandinikhandewal.netlify.app/) | [GitHub](https://github.com/nandinikhandelwal120603)
 
 STRICT JSON OUTPUT:
 {

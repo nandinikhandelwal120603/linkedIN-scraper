@@ -60,6 +60,18 @@ export default function App() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingSendContactId, setPendingSendContactId] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isCheckingBounces, setIsCheckingBounces] = useState(false);
+  const [bounceCheckCountdown, setBounceCheckCountdown] = useState(0);
+
+  const autoSendRef = React.useRef(autoSend);
+  useEffect(() => {
+    autoSendRef.current = autoSend;
+  }, [autoSend]);
+
+  const contactsRef = React.useRef(contacts);
+  useEffect(() => {
+    contactsRef.current = contacts;
+  }, [contacts]);
 
   // --- PERSISTENCE EFFECT ---
   useEffect(() => {
@@ -131,6 +143,28 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTab, viewMode, contacts.length]);
+
+  // Effect to manage 10-minute bounce checking countdown
+  useEffect(() => {
+    if (bounceCheckCountdown <= 0) return;
+    const interval = setInterval(() => {
+      setBounceCheckCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          handleCheckBounces(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [bounceCheckCountdown]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   // --- ACTIONS ---
   
@@ -624,7 +658,7 @@ export default function App() {
 
   // Trigger Send: Dispatches via Gmail API if enabled, otherwise opens compose link
   const handleSendEmail = async (contactId, isConfirmed = false) => {
-    const contact = contacts.find(c => c.id === contactId);
+    const contact = contactsRef.current.find(c => c.id === contactId);
     if (!contact) return;
 
     // Check daily limit
@@ -646,7 +680,7 @@ export default function App() {
     }
 
     // Check confirmation modal (for manual review mode)
-    if (!autoSend && !isConfirmed) {
+    if (!autoSendRef.current && !isConfirmed) {
       setPendingSendContactId(contactId);
       setShowConfirmModal(true);
       return;
@@ -724,6 +758,9 @@ export default function App() {
         console.error('Failed to log outreach to backend:', err);
       }
 
+      // Start/reset 10-minute countdown for bounce checking
+      setBounceCheckCountdown(600);
+
       // Start 25-second cooldown delay
       setIsDelayActive(true);
       let timeLeft = 25;
@@ -738,12 +775,14 @@ export default function App() {
       }, 1000);
 
       // Auto-Send Flow
-      if (autoSend) {
-        const nextContact = contacts.find(c => c.id !== contactId && c.status === 'not_applied');
+      if (autoSendRef.current) {
+        const nextContact = contactsRef.current.find(c => c.id !== contactId && (c.status === 'not_applied' || c.status === 'failed'));
         if (nextContact) {
           // Trigger after the cooldown ends
           setTimeout(() => {
-            handleSendEmail(nextContact.id);
+            if (autoSendRef.current) {
+              handleSendEmail(nextContact.id, true);
+            }
           }, 25500);
         } else {
           alert("Auto-Send completed! No more contacts to send.");
@@ -783,6 +822,76 @@ export default function App() {
         console.error('Failed to log failure to backend:', err);
       }
     }
+  };
+
+  const handleCheckBounces = async (silent = false) => {
+    if (isCheckingBounces) return;
+    if (!silent) {
+      setIsCheckingBounces(true);
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/check-bounces`);
+      const result = await res.json();
+      if (result.success) {
+        const bounces = result.processedBounces || [];
+        if (bounces.length > 0) {
+          // Update status in local contacts array
+          setContacts(prev => prev.map(c => {
+            const isBounced = bounces.some(b => b.hr_email?.toLowerCase() === c.hr_email?.toLowerCase());
+            if (isBounced) {
+              return {
+                ...c,
+                status: 'failed',
+                notes: 'Address not found / Mailbox unavailable (Gmail Bounce back)'
+              };
+            }
+            return c;
+          }));
+          alert(`Gmail bounce checker: Found and marked ${bounces.length} new bounced email(s) as failed.`);
+          fetchHistory();
+        } else {
+          if (!silent) {
+            alert("Gmail bounce checker: No new bounced emails detected.");
+          }
+        }
+      } else {
+        if (!silent) {
+          alert(`Failed to check bounces: ${result.error || "Unknown error"}`);
+        }
+      }
+    } catch (err) {
+      console.error("Error checking bounces:", err);
+      if (!silent) {
+        alert(`Error checking bounces: ${err.message}`);
+      }
+    } finally {
+      if (!silent) {
+        setIsCheckingBounces(false);
+      }
+    }
+  };
+
+  const startBulkSend = async () => {
+    if (!useGmailApi) {
+      alert("Gmail API is currently disabled. Please enable it in Settings to start email automation.");
+      return;
+    }
+
+    const firstLead = contactsRef.current.find(c => c.status === 'not_applied' || c.status === 'failed');
+    if (!firstLead) {
+      alert("No unsent or failed leads found to automate.");
+      return;
+    }
+
+    setAutoSend(true);
+    setBounceCheckCountdown(600);
+    alert("Starting email automation! Sending emails sequentially with a 25-second cooldown. Gmail bounce check will run automatically in 10 minutes.");
+    await handleSendEmail(firstLead.id, true);
+  };
+
+  const stopBulkSend = () => {
+    setAutoSend(false);
+    alert("Email automation stopped.");
   };
 
   // Trigger Send for Follow-up email
@@ -1301,7 +1410,98 @@ export default function App() {
             <h2 style={{ fontSize: '1.3rem', fontWeight: 600, color: 'var(--text-primary)' }}>
               Outreach Workspace & SSoT Tracker
             </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {/* Bounce Check Countdown */}
+              {bounceCheckCountdown > 0 && (
+                <span style={{ 
+                  fontSize: '0.75rem', 
+                  color: 'var(--accent-amber)', 
+                  background: 'rgba(245, 158, 11, 0.08)', 
+                  padding: '4px 8px', 
+                  borderRadius: '6px', 
+                  border: '1px solid rgba(245, 158, 11, 0.2)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  <i className="ti ti-clock animate-pulse"></i> Bounce Check in {formatTime(bounceCheckCountdown)}
+                </span>
+              )}
+
+              {/* Start/Stop Automation Button */}
+              {autoSend ? (
+                <button 
+                  onClick={stopBulkSend}
+                  className="btn"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.75rem',
+                    borderRadius: '6px',
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    height: '28px'
+                  }}
+                >
+                  <i className="ti ti-player-pause"></i> Stop Automation
+                </button>
+              ) : (
+                <button 
+                  onClick={startBulkSend}
+                  className="btn"
+                  disabled={contacts.length === 0}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.75rem',
+                    borderRadius: '6px',
+                    background: 'rgba(59, 130, 246, 0.12)',
+                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    color: 'var(--accent-blue)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    height: '28px'
+                  }}
+                >
+                  <i className="ti ti-rocket"></i> Start Email Automation
+                </button>
+              )}
+
+              {/* Check Gmail Bounces Button */}
+              <button 
+                onClick={() => handleCheckBounces(false)}
+                className="btn"
+                disabled={isCheckingBounces || contacts.length === 0}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.75rem',
+                  borderRadius: '6px',
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  color: 'var(--accent-emerald)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  height: '28px'
+                }}
+              >
+                {isCheckingBounces ? (
+                  <>
+                    <span className="spinner" style={{ width: '10px', height: '10px', borderWidth: '1.5px', marginRight: '2px' }}></span> Checking...
+                  </>
+                ) : (
+                  <>
+                    <i className="ti ti-mail-opened"></i> Check Gmail Bounces
+                  </>
+                )}
+              </button>
+
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 Total leads: {contacts.length}
               </span>

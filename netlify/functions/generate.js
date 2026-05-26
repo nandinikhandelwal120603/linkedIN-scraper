@@ -34,9 +34,18 @@ STRICT RULES:
 1. Keep the output companies list limited to top 8-10 ONLY.
 2. For each company, provide 1 or 2 HR/recruiter contacts.
 3. STRICT RULES & GOLDEN PRINCIPLES:
-   - High-Signal Keywords Only: Don't say "I am an expert developer who writes clean code." Say "I build with Python and LangGraph." Let the specific tools you use do the talking.
-   - Name the Project: Always name-drop a specific project from the candidate's profile (like AutoStream or GymFlow). It anchors your claims in reality and gives them something specific to ask about.
-   - The "What's in it for them" Pivot: The transition from what you built to how it helps them is where most cold emails fail. Always make sure you guess a real problem they are trying to solve and offer your skills as the solution.
+   - Speak Developer-to-Developer: Write exactly how engineers talk to each other on Slack/Discord: concise, direct, focused on implementation over theory. Ask yourself: "Would I say this out loud to another engineer over a beer?" If it sounds too formal/stiff, rewrite it.
+   - Respect Their Scale (Don't Lecture Them): Never explain a company's own tech stack or business model back to them. Empathize with the difficulty of their scale instead.
+     * ❌ "Indeed relies on sub-millisecond query routing to handle massive job indexes."
+     * ✓ "Managing search intent across millions of live job posts is a massive data challenge."
+   - Talk About HOW You Build: High-signal engineers talk architecture and constraints. Use specific, production-focused keywords. Use terms like: deterministic workflows, high-throughput, evaluation harnesses, latency reduction, state management, edge cases. E.g. "Moving past basic prompt chains into deterministic LangGraph workflows."
+   - Strip Out Passive, Formal Fluff: Avoid corporate phrases. E.g.
+     * Replace "I recognize the challenge of..." with "Scaling [X] usually runs into..."
+     * Replace "I would love to learn about your roadmap..." with "I'd love to see how you're handling..."
+     * Replace "My experience could support your team..." with "Love to share how I solved this..."
+     * Replace "Are you open to a 10-minute technical sync?" with "Open to a quick 10-minute chat?"
+   - Use Grit Over Polish: Sound like a builder who just stepped away from their IDE. Use active, punchy verbs (slashed latency, cut bottlenecks, shipped) and casual punctuation (—, /) naturally.
+   - Name the Project: Always name-drop a specific project from the candidate's profile (like AutoStream or GymFlow). It anchors your claims in reality.
    - Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
    - No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
    - No begging tone, no long paragraphs, no resume-style listing.
@@ -59,10 +68,11 @@ Hey [Name],
 
 [The Connection]: Show you understand their business by naming a specific technical challenge they likely face (e.g., data pipeline scaling, UX constraints, automation bottlenecks).
 
-[The Low-Friction Call to Action]: Specific, short time commitment + clear next steps (Portfolio/GitHub link).
+[The Low-Friction Call to Action]: Specific, short time commitment + clear next steps. Link to portfolio and GitHub.
 
 Best,
 [Your Name]
+[nandinikhandewal.netlify.app](https://nandinikhandewal.netlify.app/) | [GitHub](https://github.com/nandinikhandelwal120603)
 
 OUTPUT FORMAT (STRICT JSON):
 {
