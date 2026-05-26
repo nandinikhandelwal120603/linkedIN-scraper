@@ -565,59 +565,79 @@ export async function handler(event) {
         topJobs = scoredJobs.slice(0, 8);
         console.log(`✅ Serper search complete. Found ${scoredJobs.length} matching jobs, selected top ${topJobs.length}.`);
 
-        // Extract company names from topJobs to run real-time recruiter searches
-        let companiesList = [];
-        if (topJobs.length > 0) {
-          const extractionPrompt = `
-Analyze these job search results and extract a clean list of company names offering these jobs.
-Format the output as a strict JSON array of strings, e.g. ["Google", "BuiltIn", "Glassdoor"].
-Do not include any explanation or extra text, only the JSON array.
-
-Job listings:
-${topJobs.map((j, idx) => `${idx + 1}. Title: ${j.title} | Snippet: ${j.snippet}`).join("\n")}
-`;
+        // Extract company names and domains from topJobs to run real-time recruiter searches
+        const uniqueCompanies = [];
+        const seenCompanies = new Set();
+        
+        topJobs.forEach(job => {
+          let companyName = job.snippet.split(" - ")[0] || job.title.split(" - ")[0] || "";
+          companyName = companyName.trim();
+          if (!companyName || seenCompanies.has(companyName.toLowerCase())) return;
+          
+          seenCompanies.add(companyName.toLowerCase());
+          
+          let domain = "";
           try {
-            const rawCompanies = await callGemini(extractionPrompt);
-            companiesList = safeParse(rawCompanies);
-            if (Array.isArray(companiesList)) {
-              companiesList = Array.from(new Set(companiesList.map(c => c.trim()).filter(Boolean)));
-            } else {
-              companiesList = [];
+            const parsedUrl = new URL(job.link);
+            domain = parsedUrl.hostname.replace("www.", "");
+            const jobBoards = ["indeed.", "linkedin.", "glassdoor.", "builtin.", "google.", "ziprecruiter.", "monster.", "simplyhired.", "naukri.", "wellfound.", "angel.co", "careerbuilder."];
+            const isJobBoard = jobBoards.some(board => domain.includes(board));
+            if (isJobBoard) {
+              domain = companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
             }
           } catch (e) {
-            console.error("Failed to extract company names for recruiter search:", e.message);
+            domain = companyName.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
           }
-        }
+          
+          uniqueCompanies.push({ companyName, domain });
+        });
 
-        if (companiesList.length > 0) {
-          console.log(`🔍 Running Serper searches for actual recruiters at companies: ${companiesList.join(", ")}`);
-          const recruiterSearchPromises = companiesList.map(async (companyName) => {
-            const q = `"${companyName}" (recruiter OR "talent acquisition" OR "hiring manager" OR "HR") LinkedIn`;
+        if (uniqueCompanies.length > 0) {
+          console.log(`🔍 Running Serper searches for actual recruiters and emails at companies: ${uniqueCompanies.map(c => `${c.companyName} (${c.domain})`).join(", ")}`);
+          const recruiterSearchPromises = uniqueCompanies.map(async ({ companyName, domain }) => {
+            const q1 = `"${companyName}" (recruiter OR "talent acquisition" OR "hiring manager") LinkedIn`;
+            const q2 = `"${companyName}" (recruiter OR "talent acquisition" OR "hiring manager") "@${domain}"`;
+            
             try {
-              const response = await fetch("https://google.serper.dev/search", {
-                method: "POST",
-                headers: {
-                  "X-API-KEY": serperApiKey,
-                  "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ q, num: 3 })
-              });
-              if (response.ok) {
-                const data = await response.json();
-                const items = (data.organic || [])
-                  .map(item => `- Title/Name: ${item.title}\n  Profile: ${item.link}\n  Snippet: ${item.snippet}`)
-                  .join("\n");
-                return { company: companyName, contacts: items || "No organic search results found." };
+              const [res1, res2] = await Promise.all([
+                fetch("https://google.serper.dev/search", {
+                  method: "POST",
+                  headers: { "X-API-KEY": serperApiKey, "Content-Type": "application/json" },
+                  body: JSON.stringify({ q: q1, num: 3 })
+                }).then(r => r.ok ? r.json() : null),
+                fetch("https://google.serper.dev/search", {
+                  method: "POST",
+                  headers: { "X-API-KEY": serperApiKey, "Content-Type": "application/json" },
+                  body: JSON.stringify({ q: q2, num: 3 })
+                }).then(r => r.ok ? r.json() : null)
+              ]);
+              
+              const contacts = [];
+              if (res1 && res1.organic) {
+                res1.organic.forEach(item => {
+                  contacts.push(`- LinkedIn Profile: ${item.title}\n  Profile Link: ${item.link}\n  Snippet: ${item.snippet}`);
+                });
               }
+              if (res2 && res2.organic) {
+                res2.organic.forEach(item => {
+                  contacts.push(`- Email/Contact info: ${item.title}\n  Link: ${item.link}\n  Snippet: ${item.snippet}`);
+                });
+              }
+              
+              return { 
+                company: companyName, 
+                domain, 
+                contacts: contacts.join("\n") || "No real-time contact details found." 
+              };
             } catch (err) {
               console.error(`Failed to fetch recruiter search for ${companyName}:`, err.message);
             }
-            return { company: companyName, contacts: "No recruiter search results found." };
+            return { company: companyName, domain, contacts: "No recruiter search results found." };
           });
 
           const recruiterResults = await Promise.all(recruiterSearchPromises);
           recruiterSignalsText = recruiterResults.map(r => `
-Company: ${r.company}
+Company: ${r.company} (Domain: ${r.domain})
 Recruiter Search Results:
 ${r.contacts}
 `).join("\n---\n");
