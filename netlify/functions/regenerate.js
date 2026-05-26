@@ -105,10 +105,20 @@ STRICT RULES:
 4. Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
 
 EMAIL STRUCTURE (MANDATORY):
-1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
-2. PROOF (1-2 lines): mention ONE relevant project from candidate's projects that matches company stack/needs.
-3. VALUE (1 line): connect candidate's work to company's needs.
-4. CLOSE (1 line): soft but confident ask (e.g. "Worth a quick chat?").
+Subject: [Hook / Direct value proposition relevant to them]
+
+Hey [Name],
+
+[The Context]: Short, genuine nod to their product (no corporate fluff).
+
+[The Flex]: 1-2 sentences stating exactly what you do, naming 1-2 high-signal tools (e.g., LangGraph, Supabase, Streamlit) and a concrete project you actually built. 
+
+[The Connection]: Show you understand their business by naming a specific technical challenge they likely face (e.g., data pipeline scaling, UX constraints, automation bottlenecks).
+
+[The Low-Friction Call to Action]: Specific, short time commitment + clear next steps (Portfolio/GitHub link).
+
+Best,
+[Your Name]
 
 OUTPUT FORMAT (STRICT JSON):
 {
