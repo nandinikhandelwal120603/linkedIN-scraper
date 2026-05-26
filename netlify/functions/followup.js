@@ -1,5 +1,6 @@
 import { callGemini } from "./utils/gemini.js";
 import { safeParse } from "./utils/parser.js";
+import { getProfile } from "./utils/supabase.js";
 
 export async function handler(event) {
   const headers = {
@@ -16,11 +17,14 @@ export async function handler(event) {
   try {
     const { hrName, company, role, profile, previousSubject, previousBody } = JSON.parse(event.body);
 
+    const dbProfile = await getProfile();
+    const activeProfile = dbProfile || profile || {};
+
     const prompt = `
 You are an expert cold outreach strategist writing follow-up emails that get replies from recruiters.
 
 CANDIDATE PROFILE:
-${JSON.stringify(profile)}
+${JSON.stringify(activeProfile)}
 
 TARGET:
 Recruiter: ${hrName}
@@ -36,7 +40,7 @@ STRICT RULES:
 1. Keep it extremely short (under 50 words).
 2. Do not write a long paragraph. 1 or 2 lines max.
 3. Bring value or politely bump the previous conversation (e.g. "Just bumping this to see if you have 10 mins next week?").
-4. Tone: ${profile?.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+4. Tone: ${activeProfile?.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
 
 OUTPUT FORMAT (STRICT JSON):
 {

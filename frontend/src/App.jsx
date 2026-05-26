@@ -820,14 +820,20 @@ export default function App() {
   const targetOutreach = 100;
   const progressPercent = Math.min(Math.round((totalOutreachProgress / targetOutreach) * 100), 100);
 
+  const todayString = new Date().toDateString();
+  const sentToday = historyLogs.filter(log => {
+    const logDate = new Date(log.created_at || log.timestamp).toDateString();
+    return logDate === todayString && (log.status === 'sent' || log.status === 'replied' || log.status === 'interview');
+  }).length;
+
   return (
     <div className="app-container">
       {/* HEADER */}
       <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1>
-            <span style={{ fontSize: '2.5rem' }}>🤖</span>
-            AI Outreach Agent
+            <span style={{ fontSize: '2.5rem' }}>🚀</span>
+            Nandini Outreach Agent
           </h1>
           <p className="sub-header" style={{ margin: 0 }}>
             Automated Cold Outreach Command Center for Tech Candidates.
@@ -916,145 +922,6 @@ export default function App() {
         </div>
       )}
 
-      {/* CORE PROFILE SECTION */}
-      <div className="glass-panel">
-        <div 
-          className="panel-title" 
-          style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showProfile ? '1.25rem' : '0' }}
-          onClick={() => setShowProfile(!showProfile)}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <i className="ti ti-id-badge" style={{ color: 'var(--accent-purple)' }}></i> 
-            Your Professional Profile (Resume Context)
-          </div>
-          <i className={`ti ti-chevron-${showProfile ? 'up' : 'down'}`} style={{ color: 'var(--text-secondary)' }}></i>
-        </div>
-
-        {showProfile && (
-          <div className="animate-slide-up" style={{ borderTop: '1px solid var(--border-light)', paddingTop: '1.25rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              <div>
-                <label>Full Name</label>
-                <input 
-                  type="text" 
-                  name="name" 
-                  placeholder="Rahul Sharma" 
-                  value={profile.name} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>Degree & Branch</label>
-                <input 
-                  type="text" 
-                  name="degree" 
-                  placeholder="B.Tech Computer Science 2025" 
-                  value={profile.degree} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>College/University</label>
-                <input 
-                  type="text" 
-                  name="college" 
-                  placeholder="NIT Warangal" 
-                  value={profile.college} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>CGPA / Percentage</label>
-                <input 
-                  type="text" 
-                  name="cgpa" 
-                  placeholder="8.9 CGPA" 
-                  value={profile.cgpa} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>Target Outreach Role</label>
-                <input 
-                  type="text" 
-                  name="targetRole" 
-                  placeholder="GenAI Intern / Software Engineer" 
-                  value={profile.targetRole} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>LinkedIn URL</label>
-                <input 
-                  type="text" 
-                  name="linkedin" 
-                  placeholder="linkedin.com/in/rahul" 
-                  value={profile.linkedin} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>GitHub / Portfolio URL</label>
-                <input 
-                  type="text" 
-                  name="github" 
-                  placeholder="github.com/rahul" 
-                  value={profile.github} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-              <div>
-                <label>Outreach Tone (Important)</label>
-                <input 
-                  type="text" 
-                  name="tone" 
-                  placeholder="e.g. confident, builder, not desperate" 
-                  value={profile.tone || ''} 
-                  onChange={handleProfileChange}
-                />
-              </div>
-            </div>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-              <div>
-                <label>Core Technical Skills</label>
-                <textarea 
-                  name="skills" 
-                  placeholder="React, Node.js, Python, LangChain, PyTorch, SQL, AWS..." 
-                  style={{ minHeight: '80px' }}
-                  value={profile.skills} 
-                  onChange={handleProfileChange}
-                ></textarea>
-              </div>
-              <div>
-                <label>Major Projects & Achievements</label>
-                <textarea 
-                  name="projects" 
-                  placeholder="Built an LLM agent that automates SQL queries with 94% accuracy. Won national hackathon. Interned as ML Dev..." 
-                  style={{ minHeight: '80px' }}
-                  value={profile.projects} 
-                  onChange={handleProfileChange}
-                ></textarea>
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
-                💡 Profile updates are saved locally and synced to your central database on save.
-              </p>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                onClick={saveProfileToDb} 
-                disabled={isSavingProfile}
-                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
-              >
-                {isSavingProfile ? 'Saving...' : 'Save to Supabase'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* CORE NAVIGATION TABS */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-medium)', marginBottom: '1.5rem', gap: '2rem' }}>
         <button 
@@ -1118,6 +985,25 @@ export default function App() {
           onClick={() => setActiveTab('history')}
         >
           <i className="ti ti-history" style={{ fontSize: '1.1rem' }}></i> Server Activity Log
+        </button>
+        <button 
+          style={{
+            background: 'none',
+            border: 'none',
+            borderBottom: activeTab === 'profile-setting' ? '2.5px solid var(--accent-blue)' : '2.5px solid transparent',
+            color: activeTab === 'profile-setting' ? 'var(--text-primary)' : 'var(--text-muted)',
+            padding: '0.75rem 0.5rem',
+            fontSize: '1rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+          onClick={() => setActiveTab('profile-setting')}
+        >
+          <i className="ti ti-id-badge" style={{ fontSize: '1.1rem' }}></i> Nandini Profile
         </button>
       </div>
 
@@ -1854,6 +1740,144 @@ export default function App() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB 4: PROFILE SETTINGS */}
+      {activeTab === 'profile-setting' && (
+        <div className="glass-panel animate-slide-up">
+          <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <i className="ti ti-id-badge" style={{ color: 'var(--accent-purple)' }}></i>
+              Nandini Outreach Profile (Supabase Sync)
+            </span>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+            Configure candidate details, technical skills, target role, and cold email tone. Any edits made here can be saved directly to your Supabase cloud database.
+          </p>
+
+          <form onSubmit={saveProfileToDb}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+              <div>
+                <label>Full Name</label>
+                <input 
+                  type="text" 
+                  name="name" 
+                  placeholder="Nandini Khandelwal" 
+                  value={profile.name} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>Degree & Branch</label>
+                <input 
+                  type="text" 
+                  name="degree" 
+                  placeholder="B.Tech Computer Science 2025" 
+                  value={profile.degree} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>College/University</label>
+                <input 
+                  type="text" 
+                  name="college" 
+                  placeholder="NIT Warangal" 
+                  value={profile.college} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>CGPA / Percentage</label>
+                <input 
+                  type="text" 
+                  name="cgpa" 
+                  placeholder="9.2 CGPA" 
+                  value={profile.cgpa} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>Target Outreach Role</label>
+                <input 
+                  type="text" 
+                  name="targetRole" 
+                  placeholder="GenAI Intern / Software Engineer" 
+                  value={profile.targetRole} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>LinkedIn URL</label>
+                <input 
+                  type="text" 
+                  name="linkedin" 
+                  placeholder="linkedin.com/in/nandinikh" 
+                  value={profile.linkedin} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>GitHub / Portfolio URL</label>
+                <input 
+                  type="text" 
+                  name="github" 
+                  placeholder="github.com/nandini" 
+                  value={profile.github} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+              <div>
+                <label>Outreach Tone (Important)</label>
+                <input 
+                  type="text" 
+                  name="tone" 
+                  placeholder="e.g. confident, builder, not desperate" 
+                  value={profile.tone || ''} 
+                  onChange={handleProfileChange}
+                />
+              </div>
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+              <div>
+                <label>Core Technical Skills</label>
+                <textarea 
+                  name="skills" 
+                  placeholder="React, Node.js, Python, LangChain, PyTorch, SQL, AWS..." 
+                  style={{ minHeight: '80px' }}
+                  value={profile.skills} 
+                  onChange={handleProfileChange}
+                ></textarea>
+              </div>
+              <div>
+                <label>Major Projects & Achievements</label>
+                <textarea 
+                  name="projects" 
+                  placeholder="Built an LLM agent that automates SQL queries with 94% accuracy..." 
+                  style={{ minHeight: '80px' }}
+                  value={profile.projects} 
+                  onChange={handleProfileChange}
+                ></textarea>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid var(--border-light)', paddingTop: '1rem' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                💡 Overwriting fields updates your candidate profile data. Click save to upload to Supabase.
+              </p>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={isSavingProfile}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
+              >
+                {isSavingProfile ? 'Saving...' : 'Save to Supabase'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

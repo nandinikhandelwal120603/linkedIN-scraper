@@ -1,5 +1,6 @@
 import { callGemini } from "./utils/gemini.js";
 import { safeParse } from "./utils/parser.js";
+import { getProfile } from "./utils/supabase.js";
 
 export async function handler(event) {
   const headers = {
@@ -16,6 +17,9 @@ export async function handler(event) {
   try {
     const { role, profile } = JSON.parse(event.body);
 
+    const dbProfile = await getProfile();
+    const activeProfile = dbProfile || profile || {};
+
     const prompt = `
 You are an expert cold outreach strategist and recruiter research agent.
 Your task is to identify top hiring companies (top 8-10 ONLY) matching the target role, generate realistic HR/recruiter contact entries, and craft high-converting cold outreach emails.
@@ -24,7 +28,7 @@ TARGET ROLE:
 ${role}
 
 CANDIDATE PROFILE:
-${JSON.stringify(profile)}
+${JSON.stringify(activeProfile)}
 
 STRICT RULES:
 1. Keep the output companies list limited to top 8-10 ONLY.
@@ -32,7 +36,7 @@ STRICT RULES:
 3. Every email body must be under 120 words.
 4. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
 5. No begging tone, no long paragraphs, no resume-style listing.
-6. Tone: ${profile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+6. Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
 
 EMAIL STRUCTURE (MANDATORY):
 1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.

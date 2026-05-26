@@ -1,5 +1,6 @@
 import { callGemini } from "./utils/gemini.js";
 import { safeParse } from "./utils/parser.js";
+import { getProfile } from "./utils/supabase.js";
 
 export async function handler(event) {
   const headers = {
@@ -16,12 +17,15 @@ export async function handler(event) {
   try {
     const { hrName, company, role, profile } = JSON.parse(event.body);
 
+    const dbProfile = await getProfile();
+    const activeProfile = dbProfile || profile || {};
+
     const prompt = `
 You are an expert cold outreach strategist writing emails that get replies from busy recruiters and founders.
 Your job is NOT to sound polite, but relevant, sharp, and builder-minded.
 
 CANDIDATE PROFILE:
-${JSON.stringify(profile)}
+${JSON.stringify(activeProfile)}
 
 TARGET:
 Recruiter: ${hrName}
@@ -32,7 +36,7 @@ STRICT RULES:
 1. Keep the email body under 120 words.
 2. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
 3. No begging tone, no long paragraphs, no resume-style listing.
-4. Tone: ${profile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
+4. Tone: ${activeProfile.tone || 'confident, builder, not desperate'} (concise, builder energy, slightly technical, no fluff).
 
 EMAIL STRUCTURE (MANDATORY):
 1. HOOK (first line MUST be specific): reference company / role / something real, showing you did homework.
