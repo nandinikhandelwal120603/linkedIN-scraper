@@ -276,7 +276,10 @@ export default function App() {
               verdict: hr.validation?.verdict || 'good',
               issues: hr.validation?.issues || [],
               suggestions: hr.validation?.suggestions || [],
-              attempts: hr.validation?.attempts || 1
+              attempts: hr.validation?.attempts || 1,
+              lead_score: hr.lead_score || 75,
+              lead_priority: hr.lead_priority || 'medium',
+              lead_reason: hr.lead_reason || 'Standard lead match'
             });
           });
         }
@@ -354,6 +357,22 @@ export default function App() {
       const valResult = await valResponse.json();
       const valData = valResponse.ok ? valResult : { score: 70, verdict: 'okay', issues: [], fix_suggestions: [] };
 
+      // Third, run lead scoring with the new email validation score!
+      const scoreResponse = await fetch(`${API_BASE_URL}/score-lead`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: contact.company,
+          role: searchRole || profile.targetRole || 'Software Engineer',
+          hr_title: contact.hr_title || 'Recruiter',
+          email: contact.hr_email,
+          email_score: valData.score || 70
+        })
+      });
+
+      const scoreResult = await scoreResponse.json();
+      const scoreData = scoreResponse.ok ? scoreResult : { lead_score: contact.lead_score || 75, priority: contact.lead_priority || 'medium', reason: contact.lead_reason || 'Standard lead match' };
+
       setContacts(prev => prev.map(c => {
         if (c.id === contactId) {
           const encodedTo = encodeURIComponent(c.hr_email);
@@ -371,6 +390,9 @@ export default function App() {
             issues: valData.issues || [],
             suggestions: valData.fix_suggestions || [],
             attempts: (c.attempts || 1) + 1,
+            lead_score: scoreData.lead_score || 75,
+            lead_priority: scoreData.priority || 'medium',
+            lead_reason: scoreData.reason || 'Standard lead match',
             isRegenerating: false
           };
         }
@@ -1348,16 +1370,33 @@ export default function App() {
                     {/* Header info */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-light)', paddingBottom: '1rem', marginBottom: '1rem' }}>
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{c.company}</span>
+                          {c.lead_score && (
+                            <span 
+                              className={`badge ${
+                                c.lead_priority === 'high' ? 'badge-emerald' : 
+                                (c.lead_priority === 'medium' ? 'badge-amber' : 'badge-rose')
+                              }`}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', fontWeight: '700' }}
+                              title={c.lead_reason}
+                            >
+                              🔥 Lead Score: {c.lead_score} ({c.lead_priority.toUpperCase()})
+                            </span>
+                          )}
                           {c.careers_url && (
                             <a href={c.careers_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                               <i className="ti ti-external-link"></i> Careers
                             </a>
                           )}
                         </div>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                           Role Details & Contacts
+                          {c.lead_reason && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                              ({c.lead_reason})
+                            </span>
+                          )}
                         </p>
                       </div>
 
@@ -1738,13 +1777,22 @@ export default function App() {
                         </span>
                       ) : (c.score || 80) < 60 ? (
                         <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 600 }}>
-                          ⚠️ Score too low ({c.score}/100) to send. Click "Regenerate Pitch" to fix.
+                          ⚠️ Pitch score too low ({c.score}/100) to send. Click "Regenerate Pitch" to fix.
+                        </span>
+                      ) : (c.lead_score || 75) < 60 ? (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 600 }}>
+                          ⚠️ Lead probability score too low ({c.lead_score}/100) to send.
                         </span>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           {(c.score || 80) < 80 && (
                             <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', fontStyle: 'italic', maxWidth: '180px', textAlign: 'right' }}>
-                              ⚠️ Score is {c.score}/100. Watch out for weak proof/hook.
+                              ⚠️ Pitch score is {c.score}/100.
+                            </span>
+                          )}
+                          {(c.lead_score || 75) >= 60 && (c.lead_score || 75) <= 75 && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', fontStyle: 'italic', maxWidth: '180px', textAlign: 'right' }}>
+                              ⚠️ Lead score is {c.lead_score}/100. Manual review recommended.
                             </span>
                           )}
                           <button 

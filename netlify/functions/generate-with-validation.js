@@ -159,79 +159,74 @@ OUTPUT JSON:
   }
 }
 
-// Process a single HR contact's email in a self-improving loop
-async function processContact(hr, companyName, role, activeProfile) {
-  const MAX_RETRIES = 2;
-  let attempt = 0;
+// Helper to run lead scoring evaluation
+async function scoreLead(company, role, hrTitle, emailScore) {
+  const prompt = `
+You are evaluating whether a job outreach lead is worth emailing.
 
-  let currentSubject = hr.email_content?.subject || 'Job Opportunity';
-  let currentBody = hr.email_content?.body || '';
+Your goal:
+Prioritize leads with the highest chance of reply.
 
-  let bestSubject = currentSubject;
-  let bestBody = currentBody;
-  let bestScore = 0;
-  let bestValidation = null;
+---
 
-  while (attempt <= MAX_RETRIES) {
-    const validation = await validateEmail(currentSubject, currentBody, companyName, role);
-    const score = Number(validation.score) || 0;
+LEAD INFO:
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestSubject = currentSubject;
-      bestBody = currentBody;
-      bestValidation = validation;
-    }
+Company: ${company}
+Role: ${role}
+HR Title: ${hrTitle}
+Email Score: ${emailScore}
 
-    if (score >= 80) {
-      return {
-        ...hr,
-        email_content: {
-          subject: currentSubject,
-          body: currentBody
-        },
-        validation: {
-          score,
-          verdict: validation.verdict || "approved",
-          issues: validation.issues || [],
-          suggestions: validation.fix_suggestions || [],
-          attempts: attempt + 1,
-          status: "approved"
-        }
-      };
-    }
+---
 
-    // Otherwise, regenerate using feedback
-    const regenerated = await regenerateEmail(
-      currentSubject,
-      currentBody,
-      validation.issues || [],
-      validation.fix_suggestions || [],
-      activeProfile
-    );
+EVALUATE:
 
-    currentSubject = regenerated.subject || currentSubject;
-    currentBody = regenerated.body || currentBody;
+1. COMPANY TYPE (0–25)
+- Startup / small team → high
+- Mid-size → medium
+- Big tech / corporate → low
 
-    attempt++;
+2. ROLE RELEVANCE (0–25)
+- Direct match → high
+- Partial match → medium
+- Weak → low
+
+3. DECISION MAKER PROXIMITY (0–25)
+- Founder / Hiring Manager → high
+- Engineer / Team Lead → medium
+- Generic HR → low
+
+4. EMAIL QUALITY SCORE (0–25)
+- Use given email_score (normalize the score from 0-100 down to 0-25)
+
+---
+
+BEHAVIOR RULES:
+- Be practical, not optimistic
+- Prefer startups over big companies
+- Prefer builders over HR
+- Be selective
+
+---
+
+RETURN JSON:
+{
+  "lead_score": number,
+  "priority": "high" | "medium" | "low",
+  "reason": "short explanation"
+}
+`;
+
+  try {
+    const raw = await callGemini(prompt);
+    return safeParse(raw);
+  } catch (err) {
+    console.error("Lead scoring error:", err);
+    return {
+      lead_score: 70,
+      priority: "medium",
+      reason: "Could not evaluate lead score due to API error: " + err.message
+    };
   }
-
-  // Fallback: return best version
-  return {
-    ...hr,
-    email_content: {
-      subject: bestSubject,
-      body: bestBody
-    },
-    validation: {
-      score: bestScore,
-      verdict: bestValidation?.verdict || "fallback_best",
-      issues: bestValidation?.issues || [],
-      suggestions: bestValidation?.fix_suggestions || [],
-      attempts: MAX_RETRIES + 1,
-      status: "fallback_best"
-    }
-  };
 }
 
 export async function handler(event) {
@@ -265,7 +260,7 @@ ${JSON.stringify(activeProfile)}
 
 STRICT RULES:
 1. Keep the output companies list limited to top 8-10 ONLY.
-2. For each company, provide 1 or 2 HR/recruiter contacts.
+2. Return maximum ONE contact per company. Do NOT include multiple employees from the same company. Prefer diversity of companies over multiple contacts.
 3. Every email body must be under 120 words.
 4. No generic phrases ("I hope you're doing well", "I came across your company", "I am very interested").
 5. No begging tone, no long paragraphs, no resume-style listing.
@@ -310,26 +305,163 @@ Now generate the output.
       throw new Error("Invalid output from AI agent generator: missing companies array");
     }
 
+    // Flatten contacts list to process validation in parallel
+    const initialLeads = [];
+    parsed.companies.forEach(company => {
+      if (company.hr_contacts && Array.isArray(company.hr_contacts)) {
+        company.hr_contacts.forEach(hr => {
+          initialLeads.push({
+            company_name: company.company_name,
+            industry: company.industry || 'Tech',
+            reason_for_selection: company.reason_for_selection || '',
+            hr_name: hr.name,
+            hr_email: hr.email,
+            hr_email_confidence: hr.email_confidence || 'medium',
+            hr_linkedin: hr.linkedin || '',
+            hr_title: hr.title || 'Recruiter',
+            email_content: hr.email_content || { subject: '', body: '' }
+          });
+        });
+      }
+    });
+
     // 2. Validate and auto-improve each contact's email in parallel
-    const processedCompanies = await Promise.all(parsed.companies.map(async (company) => {
-      if (!company.hr_contacts || !Array.isArray(company.hr_contacts)) {
-        return company;
+    const validatedLeads = await Promise.all(initialLeads.map(async (lead) => {
+      const MAX_RETRIES = 2;
+      let attempt = 0;
+
+      let currentSubject = lead.email_content.subject || 'Job Opportunity';
+      let currentBody = lead.email_content.body || '';
+
+      let bestSubject = currentSubject;
+      let bestBody = currentBody;
+      let bestScore = 0;
+      let bestValidation = null;
+
+      while (attempt <= MAX_RETRIES) {
+        const validation = await validateEmail(currentSubject, currentBody, lead.company_name, role);
+        const score = Number(validation.score) || 0;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestSubject = currentSubject;
+          bestBody = currentBody;
+          bestValidation = validation;
+        }
+
+        if (score >= 80) {
+          return {
+            ...lead,
+            email_content: {
+              subject: currentSubject,
+              body: currentBody
+            },
+            validation: {
+              score,
+              verdict: validation.verdict || "approved",
+              issues: validation.issues || [],
+              suggestions: validation.fix_suggestions || [],
+              attempts: attempt + 1,
+              status: "approved"
+            }
+          };
+        }
+
+        const regenerated = await regenerateEmail(
+          currentSubject,
+          currentBody,
+          validation.issues || [],
+          validation.fix_suggestions || [],
+          activeProfile
+        );
+
+        currentSubject = regenerated.subject || currentSubject;
+        currentBody = regenerated.body || currentBody;
+
+        attempt++;
       }
 
-      const processedHR = await Promise.all(company.hr_contacts.map(async (hr) => {
-        return await processContact(hr, company.company_name, role, activeProfile);
-      }));
+      return {
+        ...lead,
+        email_content: {
+          subject: bestSubject,
+          body: bestBody
+        },
+        validation: {
+          score: bestScore,
+          verdict: bestValidation?.verdict || "fallback_best",
+          issues: bestValidation?.issues || [],
+          suggestions: bestValidation?.fix_suggestions || [],
+          attempts: MAX_RETRIES + 1,
+          status: "fallback_best"
+        }
+      };
+    }));
+
+    // 3. Deduplication: Pick the BEST contact per company (highest validation score)
+    const companyMap = new Map();
+    for (const lead of validatedLeads) {
+      const key = lead.company_name.toLowerCase().trim();
+      if (!companyMap.has(key)) {
+        companyMap.set(key, lead);
+      } else {
+        const existing = companyMap.get(key);
+        const currentScore = lead.validation?.score || 0;
+        const existingScore = existing.validation?.score || 0;
+        if (currentScore > existingScore) {
+          companyMap.set(key, lead);
+        }
+      }
+    }
+    const uniqueLeads = Array.from(companyMap.values());
+
+    // 4. Score each unique lead using the Lead Scoring Agent (in parallel)
+    const scoredLeads = await Promise.all(uniqueLeads.map(async (lead) => {
+      const scoreResult = await scoreLead(
+        lead.company_name,
+        role,
+        lead.hr_title,
+        lead.validation?.score || 80
+      );
 
       return {
-        ...company,
-        hr_contacts: processedHR
+        ...lead,
+        lead_score: scoreResult.lead_score || 70,
+        lead_priority: scoreResult.priority || 'medium',
+        lead_reason: scoreResult.reason || 'Standard lead match'
       };
+    }));
+
+    // 5. Filter: keep only leads with lead_score >= 70, Sort descending by lead_score, Slice to top 8 (target 5-8 unique companies)
+    const finalLeads = scoredLeads
+      .filter(l => l.lead_score >= 70)
+      .sort((a, b) => b.lead_score - a.lead_score)
+      .slice(0, 8);
+
+    // 6. Format back to company-oriented structure for the frontend
+    const finalCompanies = finalLeads.map(lead => ({
+      company_name: lead.company_name,
+      industry: lead.industry,
+      reason_for_selection: lead.reason_for_selection,
+      hr_contacts: [
+        {
+          name: lead.hr_name,
+          email: lead.hr_email,
+          email_confidence: lead.hr_email_confidence,
+          linkedin: lead.hr_linkedin,
+          email_content: lead.email_content,
+          validation: lead.validation,
+          lead_score: lead.lead_score,
+          lead_priority: lead.lead_priority,
+          lead_reason: lead.lead_reason
+        }
+      ]
     }));
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ companies: processedCompanies })
+      body: JSON.stringify({ companies: finalCompanies })
     };
 
   } catch (err) {
