@@ -223,7 +223,8 @@ export default function App() {
         body: JSON.stringify({
           role: searchRole,
           profile: profile,
-          geminiKeyOverride: geminiKey
+          geminiKeyOverride: geminiKey,
+          serperKeyOverride: serperKey
         })
       });
 
@@ -260,6 +261,7 @@ export default function App() {
               company: company.company_name,
               industry: company.industry || 'Tech',
               reason_for_selection: company.reason_for_selection || '',
+              careers_url: company.job_link || '',
               hr_name: hr.name,
               hr_email: email,
               hr_email_confidence: hr.email_confidence || 'medium',
@@ -279,7 +281,8 @@ export default function App() {
               attempts: hr.validation?.attempts || 1,
               lead_score: hr.lead_score || 75,
               lead_priority: hr.lead_priority || 'medium',
-              lead_reason: hr.lead_reason || 'Standard lead match'
+              lead_reason: hr.lead_reason || 'Standard lead match',
+              mode: hr.mode || 'genai'
             });
           });
         }

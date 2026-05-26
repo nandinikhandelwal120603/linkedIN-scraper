@@ -11,3 +11,5 @@ outreach_leads_export.csv
 *.png
 *.jpg
 *.jpeg
+preprocessing/
+

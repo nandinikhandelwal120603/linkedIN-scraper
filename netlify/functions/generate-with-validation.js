@@ -432,21 +432,131 @@ export async function handler(event) {
   }
 
   try {
-    const { role, profile } = JSON.parse(event.body || '{}');
+    const { role, profile, serperKeyOverride } = JSON.parse(event.body || '{}');
 
     const dbProfile = await getProfile();
     const activeProfile = dbProfile || profile || {};
 
+    const serperApiKey = serperKeyOverride || process.env.SERPER_API_KEY;
+    let topJobs = [];
+
+    if (serperApiKey) {
+      console.log(`🔍 Running dual-pipeline Serper search for role: ${role}`);
+      const queries = [
+        `${role} fresher OR 0-1 years hiring India`,
+        `remote ${role} junior OR entry level hiring`,
+        `"we are hiring ${role}"`,
+        `"looking for ${role} developer"`,
+        `${role} internship OR fresher startup hiring`
+      ];
+
+      try {
+        const searchPromises = queries.map(async (q) => {
+          try {
+            const response = await fetch("https://google.serper.dev/search", {
+              method: "POST",
+              headers: {
+                "X-API-KEY": serperApiKey,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ q, num: 8 })
+            });
+
+            if (!response.ok) {
+              console.error(`Serper query error for "${q}": ${response.statusText}`);
+              return [];
+            }
+
+            const data = await response.json();
+            return (data.organic || []).map(item => ({
+              title: item.title || "",
+              link: item.link || "",
+              snippet: item.snippet || "",
+              source_query: q
+            }));
+          } catch (err) {
+            console.error(`Serper query network error for "${q}":`, err.message);
+            return [];
+          }
+        });
+
+        const results = await Promise.all(searchPromises);
+        const allJobs = results.flat();
+
+        // 1. Tagging (Remote vs India)
+        const tagged = allJobs.map(job => {
+          const isRemote = job.source_query.toLowerCase().includes("remote") || 
+                           job.title.toLowerCase().includes("remote") || 
+                           job.snippet.toLowerCase().includes("remote");
+          return {
+            ...job,
+            type: isRemote ? "remote" : "india"
+          };
+        });
+
+        // 2. Filtering for junior/entry/fresher intent
+        const filtered = tagged.filter(job => {
+          const text = (job.title + " " + job.snippet).toLowerCase();
+          return (
+            text.includes("fresher") ||
+            text.includes("0-1") ||
+            text.includes("intern") ||
+            text.includes("junior") ||
+            text.includes("entry") ||
+            text.includes("hiring")
+          );
+        });
+
+        // 3. Priority Scoring
+        const scoredJobs = filtered.map(job => {
+          let score = 0;
+          const combined = (job.title + " " + job.snippet).toLowerCase();
+          if (job.type === "remote") score += 10;
+          if (combined.includes("ai")) score += 10;
+          if (combined.includes("llm")) score += 15;
+          if (combined.includes("startup")) score += 10;
+          return { ...job, score };
+        });
+
+        scoredJobs.sort((a, b) => b.score - a.score);
+        topJobs = scoredJobs.slice(0, 8);
+        console.log(`✅ Serper search complete. Found ${scoredJobs.length} matching jobs, selected top ${topJobs.length}.`);
+      } catch (err) {
+        console.error("❌ Serper pipeline failed, falling back to generative mode:", err.message);
+      }
+    } else {
+      console.log("⚠️ No Serper API Key found, proceeding with generative-only mode.");
+    }
+
+    let jobSignalsText = "";
+    if (topJobs.length > 0) {
+      jobSignalsText = topJobs.map((j, idx) => `
+Job #${idx + 1}:
+Title: ${j.title}
+Link: ${j.link}
+Snippet: ${j.snippet}
+Type: ${j.type} (Score: ${j.score})
+`).join("\n");
+    }
+
     // 1. Generate companies and contacts
     const initialPrompt = `
 You are an expert cold outreach strategist and recruiter research agent.
-Your task is to identify top hiring companies (top 8-10 ONLY) matching the target role and generate realistic HR/recruiter contact entries.
+Your task is to identify top hiring companies (top 8-10 ONLY) and generate realistic HR/recruiter contact entries.
 
+${topJobs.length > 0 ? `
+We have gathered the following REAL job signals from active listings:
+${jobSignalsText}
+
+STRICT RULE:
+Based on the real job signals above, extract the target company name, industry, and select or guess a realistic HR/recruiter contact (e.g. Talent Acquisition, HR Manager, Founder). Map the generated contacts directly to the companies from the signals and include the "job_link" matching that company.
+` : `
 TARGET ROLE:
 ${role}
 
 CANDIDATE PROFILE:
 ${JSON.stringify(activeProfile)}
+`}
 
 STRICT RULES:
 1. Keep the output companies list limited to top 8-10 ONLY.
@@ -459,6 +569,7 @@ OUTPUT FORMAT (STRICT JSON):
       "company_name": "string",
       "industry": "string",
       "reason_for_selection": "string",
+      "job_link": "string",
       "hr_contacts": [
         {
           "name": "string",
@@ -490,6 +601,7 @@ Now generate the output.
             company_name: company.company_name,
             industry: company.industry || 'Tech',
             reason_for_selection: company.reason_for_selection || '',
+            job_link: company.job_link || '',
             hr_name: hr.name,
             hr_email: hr.email,
             hr_email_confidence: hr.email_confidence || 'medium',
@@ -551,6 +663,7 @@ Now generate the output.
       company_name: lead.company_name,
       industry: lead.industry,
       reason_for_selection: lead.reason_for_selection,
+      job_link: lead.job_link || '',
       hr_contacts: [
         {
           name: lead.hr_name,

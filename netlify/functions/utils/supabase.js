@@ -5,7 +5,7 @@ export const supabase = createClient(
   process.env.SUPABASE_KEY || ''
 );
 
-const DEFAULT_PROFILE_MODES = {
+export const DEFAULT_PROFILE_MODES = {
   genai: {
     summary: "Expert in GenAI, Large Language Models, Prompt Engineering, LangChain, RAG.",
     skills: ["Python", "LangChain", "OpenAI API", "Hugging Face", "Vector DBs", "RAG"],
@@ -19,16 +19,31 @@ const DEFAULT_PROFILE_MODES = {
     signals: ["Actively building LLM systems", "Passionate about agentic workflows"]
   },
   aiml: {
-    summary: "Machine Learning Engineer with focus on PyTorch, model optimization, and training pipelines.",
-    skills: ["Python", "PyTorch", "TensorFlow", "Scikit-Learn", "Model Fine-tuning", "Kubeflow"],
+    summary: "Machine Learning Engineer with focus on custom CNNs, real-time computer vision, audio deep learning, and multi-agent NLP pipelines.",
+    skills: ["Python", "TensorFlow", "Keras", "OpenCV", "PyTorch", "Librosa", "NLP", "CNN", "n8n"],
     key_projects: [
       {
-        title: "Predictive Maintenance Pipeline",
-        description: "Developed and deployed anomaly detection models for industrial sensors.",
-        impact: "Saved over $150k in hardware downtime across client sites."
+        title: "Real-Time Human Action Recognition System",
+        description: "A computer vision pipeline designed for live action classification using deep learning architectures (ResNet-50/34) and OpenCV for high-speed frame processing.",
+        impact: "Achieved 89.95% classification accuracy on the UCF101 dataset while maintaining low-latency performance suitable for real-time surveillance and sports analytics applications."
+      },
+      {
+        title: "Real-time Facial Recognition and Emotion Analysis System",
+        description: "A computer vision application that integrates OpenCV for face detection with a custom CNN model built in TensorFlow/Keras to perform identity recognition and multi-class emotion classification in real-time.",
+        impact: "Developed a modular pipeline for capturing, training, and inferencing facial data, enabling automated user identification and sentiment analysis with a configurable detection sensitivity."
+      },
+      {
+        title: "Jarvis Voice Assistant",
+        description: "A conversational AI interface that transforms natural speech into real-time executable workflows through a multi-agent backend.",
+        impact: "Developed a functional voice-controlled execution interface that bridges the gap between natural language input and complex system-level automation."
+      },
+      {
+        title: "Crowd Emotion Recognition System",
+        description: "A deep learning-based audio analysis system that classifies crowd collective emotions (cheering, booing, neutral) by converting audio signals into Mel spectrograms and leveraging Convolutional Neural Networks.",
+        impact: "Achieved 96.53% classification accuracy, significantly outperforming traditional machine learning models like SVM and KNN while optimizing processing time for real-time crowd behavior analysis."
       }
     ],
-    signals: ["Strong mathematical foundations", "Model optimization enthusiast"]
+    signals: ["Strong deep learning foundation", "Real-time model optimization", "Audio DSP & computer vision expert"]
   },
   cv: {
     summary: "Computer Vision specialist focusing on object detection, segmentation, and YOLO architectures.",
