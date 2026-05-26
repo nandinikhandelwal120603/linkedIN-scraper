@@ -18,8 +18,9 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
--- Migration statement to add column if table already exists
+-- Migration statements to add columns if table already exists
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS profile_modes jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS active_contacts jsonb DEFAULT '[]'::jsonb;
 
 -- 2. Create emails table to log sent/failed attempts
 CREATE TABLE IF NOT EXISTS emails (

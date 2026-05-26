@@ -45,6 +45,7 @@ export async function handler(event) {
         projects: payload.projects || '',
         tone: payload.tone || 'confident, builder, not desperate',
         profile_modes: payload.profileModes || {},
+        active_contacts: payload.activeContacts || [],
         updated_at: new Date().toISOString()
       };
 

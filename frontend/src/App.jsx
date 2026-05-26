@@ -80,6 +80,23 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('outreach_contacts', JSON.stringify(contacts));
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        await fetch(`${API_BASE_URL}/profile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...profile,
+            activeContacts: contacts
+          })
+        });
+      } catch (err) {
+        console.error("Auto-syncing contacts failed:", err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(delayDebounceFn);
   }, [contacts]);
 
   useEffect(() => {
@@ -135,6 +152,10 @@ export default function App() {
           projects: data.profile.projects || '',
           tone: data.profile.tone || 'confident, builder, not desperate'
         });
+
+        if (data.profile.active_contacts && Array.isArray(data.profile.active_contacts) && data.profile.active_contacts.length > 0) {
+          setContacts(data.profile.active_contacts);
+        }
       }
     } catch (err) {
       console.error("Failed to load profile from Supabase:", err);
@@ -148,7 +169,10 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile)
+        body: JSON.stringify({
+          ...profile,
+          activeContacts: contacts
+        })
       });
       const data = await res.json();
       if (data.success) {
