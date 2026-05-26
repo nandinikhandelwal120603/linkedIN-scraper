@@ -15,12 +15,64 @@ export async function handler(event) {
   }
 
   try {
-    const { hrName, company, role, profile } = JSON.parse(event.body);
+    const { hrName, company, role, profile, previousSubject, previousBody, issues, suggestions } = JSON.parse(event.body);
 
     const dbProfile = await getProfile();
     const activeProfile = dbProfile || profile || {};
 
-    const prompt = `
+    let prompt = '';
+
+    if (issues && Array.isArray(issues) && issues.length > 0) {
+      const prevEmailText = `Subject: ${previousSubject || ''}\n\n${previousBody || ''}`;
+      const issuesText = issues.join('\n');
+      const suggestionsText = (suggestions || []).join('\n');
+
+      prompt = `
+You are improving a cold outreach email.
+
+---
+
+PREVIOUS EMAIL:
+${prevEmailText}
+
+---
+
+ISSUES IDENTIFIED:
+${issuesText}
+
+---
+
+SUGGESTIONS:
+${suggestionsText}
+
+---
+
+IMPROVEMENT GOAL:
+
+Fix ALL issues while:
+- keeping it natural
+- keeping it short (max 120 words)
+- keeping tone confident
+- utilizing candidate profile context: ${JSON.stringify(activeProfile)}
+
+---
+
+STRICT RULES:
+- Rewrite completely (not minor edits)
+- Improve hook specificity
+- Strengthen proof (project + metric)
+- Remove generic phrases
+
+---
+
+OUTPUT JSON:
+{
+  "subject": "string",
+  "body": "string"
+}
+`;
+    } else {
+      prompt = `
 You are an expert cold outreach strategist writing emails that get replies from busy recruiters and founders.
 Your job is NOT to sound polite, but relevant, sharp, and builder-minded.
 
@@ -52,6 +104,7 @@ OUTPUT FORMAT (STRICT JSON):
 
 Now regenerate the best possible email.
 `;
+    }
 
     const raw = await callGemini(prompt);
     const parsed = safeParse(raw);

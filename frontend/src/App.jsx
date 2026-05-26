@@ -217,7 +217,7 @@ export default function App() {
     const timer3 = setTimeout(() => setLoadingStep('Crafting personalized cold emails...'), 11000);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/generate`, {
+      const response = await fetch(`${API_BASE_URL}/generate-with-validation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -271,7 +271,12 @@ export default function App() {
               notes: '',
               last_sent_at: null,
               gmail_compose_url: gmailUrl,
-              isRegenerating: false
+              isRegenerating: false,
+              score: hr.validation?.score || 80,
+              verdict: hr.validation?.verdict || 'good',
+              issues: hr.validation?.issues || [],
+              suggestions: hr.validation?.suggestions || [],
+              attempts: hr.validation?.attempts || 1
             });
           });
         }
@@ -311,6 +316,7 @@ export default function App() {
     setContacts(prev => prev.map(c => c.id === contactId ? { ...c, isRegenerating: true } : c));
 
     try {
+      // First, get the regenerated email from the backend
       const response = await fetch(`${API_BASE_URL}/regenerate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -319,6 +325,10 @@ export default function App() {
           company: contact.company,
           role: searchRole || profile.targetRole || 'Software Engineer',
           profile: profile,
+          previousSubject: contact.subject,
+          previousBody: contact.body,
+          issues: contact.issues || [],
+          suggestions: contact.suggestions || [],
           geminiKeyOverride: geminiKey
         })
       });
@@ -326,12 +336,26 @@ export default function App() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to regenerate');
 
+      const newSubject = result.subject || contact.subject;
+      const newBody = result.body || contact.body;
+
+      // Second, run validation on the newly regenerated email!
+      const valResponse = await fetch(`${API_BASE_URL}/validate-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: newSubject,
+          body: newBody,
+          company: contact.company,
+          role: searchRole || profile.targetRole || 'Software Engineer'
+        })
+      });
+
+      const valResult = await valResponse.json();
+      const valData = valResponse.ok ? valResult : { score: 70, verdict: 'okay', issues: [], fix_suggestions: [] };
+
       setContacts(prev => prev.map(c => {
         if (c.id === contactId) {
-          const newSubject = result.subject || c.subject;
-          const newBody = result.body || c.body;
-
-          // Re-generate Gmail compose URL with new body and subject
           const encodedTo = encodeURIComponent(c.hr_email);
           const encodedSubject = encodeURIComponent(newSubject);
           const encodedBody = encodeURIComponent(newBody);
@@ -342,6 +366,11 @@ export default function App() {
             subject: newSubject,
             body: newBody,
             gmail_compose_url: newUrl,
+            score: valData.score || 70,
+            verdict: valData.verdict || 'okay',
+            issues: valData.issues || [],
+            suggestions: valData.fix_suggestions || [],
+            attempts: (c.attempts || 1) + 1,
             isRegenerating: false
           };
         }
@@ -1438,6 +1467,56 @@ export default function App() {
                         onChange={(e) => handleBodyChange(c.id, e.target.value)}
                         style={{ background: 'rgba(0,0,0,0.15)', fontSize: '0.85rem', fontFamily: 'var(--font-mono)', minHeight: '160px', padding: '0.85rem' }}
                       />
+
+                      {/* Validation Score & Details Display */}
+                      <div style={{ 
+                        marginTop: '0.75rem', 
+                        padding: '0.75rem 1rem', 
+                        borderRadius: '6px', 
+                        background: (c.score || 80) >= 80 ? 'rgba(16, 185, 129, 0.05)' : ((c.score || 80) >= 60 ? 'rgba(245, 158, 11, 0.05)' : 'rgba(244, 63, 94, 0.08)'), 
+                        border: `1px solid ${
+                          (c.score || 80) >= 80 ? 'rgba(16, 185, 129, 0.2)' : 
+                          ((c.score || 80) >= 60 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(244, 63, 94, 0.3)')
+                        }`,
+                        fontSize: '0.8rem'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: '600' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <i className={`ti ti-${(c.score || 80) >= 80 ? 'circle-check' : 'alert-triangle'}`} style={{ 
+                              color: (c.score || 80) >= 80 ? 'var(--accent-emerald)' : ((c.score || 80) >= 60 ? 'var(--accent-amber)' : 'var(--accent-rose)'),
+                              fontSize: '1rem'
+                            }}></i>
+                            AI Recruiter Review Score: <strong style={{ fontSize: '0.9rem' }}>{c.score || 80}/100</strong>
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            Attempts: {c.attempts || 1} • Verdict: <strong style={{ 
+                              color: (c.score || 80) >= 80 ? 'var(--accent-emerald)' : ((c.score || 80) >= 60 ? 'var(--accent-amber)' : 'var(--accent-rose)')
+                            }}>{c.verdict ? c.verdict.toUpperCase() : 'OKAY'}</strong>
+                          </span>
+                        </div>
+
+                        {c.issues && c.issues.length > 0 && (
+                          <div style={{ marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+                            <strong style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '4px' }}>Issues to Address:</strong>
+                            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                              {c.issues.map((issue, idx) => (
+                                <li key={idx}>{issue}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {c.suggestions && c.suggestions.length > 0 && (
+                          <div style={{ marginTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem' }}>
+                            <strong style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '4px' }}>Fix Suggestions:</strong>
+                            <ul style={{ margin: 0, paddingLeft: '1.2rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                              {c.suggestions.map((sug, idx) => (
+                                <li key={idx}>{sug}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Notes field */}
@@ -1657,19 +1736,30 @@ export default function App() {
                         <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 600 }}>
                           ⚠️ Flagged as Invalid Contact (Bounce risk)
                         </span>
+                      ) : (c.score || 80) < 60 ? (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--accent-rose)', fontWeight: 600 }}>
+                          ⚠️ Score too low ({c.score}/100) to send. Click "Regenerate Pitch" to fix.
+                        </span>
                       ) : (
-                        <button 
-                          className="btn btn-primary"
-                          style={{
-                            background: isDelayActive ? 'var(--bg-tertiary)' : (c.status === 'sent' ? 'var(--accent-emerald)' : (c.status === 'failed' ? 'var(--accent-rose)' : 'var(--accent-blue)')),
-                            boxShadow: !isDelayActive && c.status === 'sent' ? '0 4px 14px rgba(16,185,129,0.3)' : undefined
-                          }}
-                          onClick={() => handleSendEmail(c.id)}
-                          disabled={!c.hr_email || isDelayActive}
-                        >
-                          <i className="ti ti-send"></i> 
-                          {isDelayActive ? `Cooldown (${cooldownTimer}s)` : (c.status === 'sent' ? 'Send Again (Compose Tab)' : (c.status === 'failed' ? 'Retry Failed Send' : 'Send Email (Compose Tab)'))}
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {(c.score || 80) < 80 && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', fontStyle: 'italic', maxWidth: '180px', textAlign: 'right' }}>
+                              ⚠️ Score is {c.score}/100. Watch out for weak proof/hook.
+                            </span>
+                          )}
+                          <button 
+                            className="btn btn-primary"
+                            style={{
+                              background: isDelayActive ? 'var(--bg-tertiary)' : (c.status === 'sent' ? 'var(--accent-emerald)' : (c.status === 'failed' ? 'var(--accent-rose)' : 'var(--accent-blue)')),
+                              boxShadow: !isDelayActive && c.status === 'sent' ? '0 4px 14px rgba(16,185,129,0.3)' : undefined
+                            }}
+                            onClick={() => handleSendEmail(c.id)}
+                            disabled={!c.hr_email || isDelayActive}
+                          >
+                            <i className="ti ti-send"></i> 
+                            {isDelayActive ? `Cooldown (${cooldownTimer}s)` : (c.status === 'sent' ? 'Send Again (Compose Tab)' : (c.status === 'failed' ? 'Retry Failed Send' : 'Send Email (Compose Tab)'))}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
